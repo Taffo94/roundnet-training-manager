@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Player, MatchmakingMode, AppState, TrainingSession, Gender } from './types';
-import { loadState, saveState } from './services/storage';
+import { loadStateFromDB, saveStateToDB, isDBConfigured } from './services/storage';
 import { generateRound, calculateNewRatings } from './services/matchmaking';
 import PlayerList from './components/PlayerList';
 import ActiveTraining from './components/ActiveTraining';
@@ -17,13 +17,44 @@ const Logo = () => (
 );
 
 const App: React.FC = () => {
-  const [state, setState] = useState<AppState>(() => loadState());
+  const [state, setState] = useState<AppState | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
+  const isInitialMount = useRef(true);
 
+  // Caricamento iniziale dal Database Cloud
   useEffect(() => {
-    saveState(state);
+    if (!isDBConfigured()) {
+      setDbError("Configurazione Supabase mancante. Assicurati di aver impostato SUPABASE_URL e SUPABASE_ANON_KEY nelle variabili d'ambiente.");
+      return;
+    }
+
+    loadStateFromDB()
+      .then(data => {
+        setState(data);
+        isInitialMount.current = false;
+      })
+      .catch(err => {
+        console.error(err);
+        setDbError("Impossibile connettersi al database. Verifica la console per i dettagli.");
+      });
+  }, []);
+
+  // Salvataggio automatico sul Cloud ad ogni modifica dello stato
+  useEffect(() => {
+    if (isInitialMount.current || !state || !isDBConfigured()) return;
+
+    const timer = setTimeout(async () => {
+      setIsSyncing(true);
+      await saveStateToDB(state);
+      setIsSyncing(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
   }, [state]);
 
   const addPlayer = (name: string, gender: Gender, basePoints: number) => {
+    if (!state) return;
     const newPlayer: Player = {
       id: Math.random().toString(36).substr(2, 9),
       name,
@@ -34,22 +65,22 @@ const App: React.FC = () => {
       matchPoints: 1200,
       lastActive: Date.now()
     };
-    setState(prev => ({ ...prev, players: [...prev.players, newPlayer] }));
+    setState(prev => prev ? ({ ...prev, players: [...prev.players, newPlayer] }) : null);
   };
 
   const updatePlayer = (id: string, name: string, gender: Gender, basePoints: number, matchPoints: number) => {
-    setState(prev => ({
+    setState(prev => prev ? ({
       ...prev,
       players: prev.players.map(p => p.id === id ? { ...p, name, gender, basePoints, matchPoints } : p)
-    }));
+    }) : null);
   };
 
   const deletePlayer = (id: string) => {
     if (window.confirm("Sei sicuro di voler eliminare definitivamente questo atleta?")) {
-      setState(prev => ({
+      setState(prev => prev ? ({
         ...prev,
         players: prev.players.filter(p => p.id !== id)
-      }));
+      }) : null);
     }
   };
 
@@ -61,15 +92,16 @@ const App: React.FC = () => {
       rounds: [],
       status: 'ACTIVE'
     };
-    setState(prev => ({ 
+    setState(prev => prev ? ({ 
       ...prev, 
       sessions: [newSession, ...prev.sessions],
       currentTab: 'training'
-    }));
+    }) : null);
   };
 
   const addRoundToSession = (sessionId: string, mode: MatchmakingMode) => {
     setState(prev => {
+      if (!prev) return null;
       const session = prev.sessions.find(s => s.id === sessionId);
       if (!session) return prev;
       const participants = prev.players.filter(p => session.participantIds.includes(p.id));
@@ -83,28 +115,29 @@ const App: React.FC = () => {
 
   const deleteRound = (sessionId: string, roundId: string) => {
     if (window.confirm("Eliminare questo round e tutte le sue partite?")) {
-      setState(prev => ({
+      setState(prev => prev ? ({
         ...prev,
         sessions: prev.sessions.map(s => s.id === sessionId ? { ...s, rounds: s.rounds.filter(r => r.id !== roundId) } : s)
-      }));
+      }) : null);
     }
   };
 
   const deleteSession = (sessionId: string) => {
-    if (window.confirm("Sei sicuro di voler eliminare l'intera sessione? Questa azione non può essere annullata e i punti assegnati non verranno stornati automaticamente (riapri i match prima se necessario).")) {
-      setState(prev => ({
+    if (window.confirm("Sei sicuro di voler eliminare l'intera sessione?")) {
+      setState(prev => prev ? ({
         ...prev,
         sessions: prev.sessions.filter(s => s.id !== sessionId)
-      }));
+      }) : null);
     }
   };
 
   const updateMatchScore = (sessionId: string, roundId: string, matchId: string, s1: number, s2: number) => {
-    // Limitazione punti da 0 a 50
+    if (!state) return;
     const clampedS1 = Math.min(Math.max(s1, 0), 50);
     const clampedS2 = Math.min(Math.max(s2, 0), 50);
 
     setState(prev => {
+      if (!prev) return null;
       const session = prev.sessions.find(s => s.id === sessionId);
       if (!session) return prev;
 
@@ -152,8 +185,9 @@ const App: React.FC = () => {
   };
 
   const reopenMatch = (sessionId: string, roundId: string, matchId: string) => {
-    if (!window.confirm("Riaprire la partita? I punti assegnati verranno stornati dal ranking.")) return;
+    if (!window.confirm("Riaprire la partita? I punti verranno stornati.")) return;
     setState(prev => {
+      if (!prev) return null;
       const session = prev.sessions.find(s => s.id === sessionId);
       const round = session?.rounds.find(r => r.id === roundId);
       const match = round?.matches.find(m => m.id === matchId);
@@ -197,7 +231,7 @@ const App: React.FC = () => {
   };
 
   const updateMatchPlayers = (sessionId: string, roundId: string, matchId: string, team: 1|2, index: 0|1, newPlayerId: string) => {
-    setState(prev => ({
+    setState(prev => prev ? ({
       ...prev,
       sessions: prev.sessions.map(s => {
         if (s.id !== sessionId) return s;
@@ -221,18 +255,52 @@ const App: React.FC = () => {
           })
         };
       })
-    }));
+    }) : null);
   };
 
   const archiveSession = (sessionId: string) => {
-    setState(prev => ({
+    setState(prev => prev ? ({
       ...prev,
       sessions: prev.sessions.map(s => 
         s.id === sessionId ? { ...s, status: 'ARCHIVED' as const } : s
       ),
       currentTab: 'history'
-    }));
+    }) : null);
   };
+
+  if (dbError) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-red-100 text-center">
+          <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-black text-slate-800 uppercase italic mb-2">Errore Configurazione</h2>
+          <p className="text-slate-500 text-sm mb-6 leading-relaxed">{dbError}</p>
+          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-slate-50 p-4 rounded-lg text-left">
+            Istruzioni:<br/>
+            1. Crea un progetto su supabase.com<br/>
+            2. Vai in Settings > API<br/>
+            3. Copia Project URL e Anon Key<br/>
+            4. Inseriscili nelle Environment Variables
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!state) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
+          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Connessione al Database Cloud...</p>
+        </div>
+      </div>
+    );
+  }
 
   const activeSession = state.sessions.find(s => s.status === 'ACTIVE');
 
@@ -243,17 +311,20 @@ const App: React.FC = () => {
           <div className="flex items-center gap-3">
             <Logo />
             <div>
-              <h1 className="text-2xl font-black uppercase tracking-tighter italic leading-none text-slate-900">
+              <h1 className="text-2xl font-black uppercase tracking-tighter italic leading-none text-slate-900 flex items-center gap-2">
                 RMI <span className="text-red-600">TRAINING</span>
+                {isSyncing && (
+                  <div className="w-2 h-2 rounded-full bg-green-500 sync-pulse" title="Sincronizzazione Cloud..."></div>
+                )}
               </h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Roundnet Milano ASD</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Database Condiviso • Produzione</p>
             </div>
           </div>
           <nav className="flex bg-slate-100 p-1 rounded-xl">
             {(['ranking', 'training', 'history'] as const).map(tab => (
               <button 
                 key={tab}
-                onClick={() => setState(p => ({ ...p, currentTab: tab }))}
+                onClick={() => setState(p => p ? ({ ...p, currentTab: tab }) : null)}
                 className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${
                   state.currentTab === tab 
                     ? 'bg-white text-red-600 shadow-sm' 
@@ -301,7 +372,7 @@ const App: React.FC = () => {
         )}
       </main>
       <footer className="py-6 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest border-t border-slate-200">
-        &copy; {new Date().getFullYear()} Roundnet Milano - Sistema Gestione Allenamenti
+        &copy; {new Date().getFullYear()} Roundnet Milano - Sistema Centralizzato Condiviso
       </footer>
     </div>
   );
