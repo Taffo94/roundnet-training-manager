@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, MatchmakingMode, AppState, TrainingSession, Gender } from './types';
-import { loadStateFromDB, saveStateToDB, isDBConfigured } from './services/storage';
+import { loadStateFromDB, saveStateToDB, isDBConfigured, getSupabaseConfig } from './services/storage';
 import { generateRound, calculateNewRatings } from './services/matchmaking';
 import PlayerList from './components/PlayerList';
 import ActiveTraining from './components/ActiveTraining';
@@ -19,12 +18,17 @@ const Logo = () => (
 const App: React.FC = () => {
   const [state, setState] = useState<AppState | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [dbError, setDbError] = useState<string | null>(null);
+  const [dbError, setDbError] = useState<{message: string, details?: string} | null>(null);
   const isInitialMount = useRef(true);
 
   useEffect(() => {
+    const config = getSupabaseConfig();
+    
     if (!isDBConfigured()) {
-      setDbError("Configurazione Cloud (Supabase) mancante nelle variabili d'ambiente.");
+      setDbError({
+        message: "Configurazione Cloud mancante",
+        details: `Variabili rilevate: URL=${config.url || 'Mancante'}, KEY=${config.hasKey ? 'Presente' : 'Mancante'}. Assicurati di aver impostato VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.`
+      });
       return;
     }
 
@@ -33,8 +37,12 @@ const App: React.FC = () => {
         setState(data);
         isInitialMount.current = false;
       })
-      .catch(() => {
-        setDbError("Errore di connessione al database cloud.");
+      .catch((err) => {
+        console.error("Load Error:", err);
+        setDbError({
+          message: "Errore di connessione al database",
+          details: err instanceof Error ? err.message : JSON.stringify(err)
+        });
       });
   }, []);
 
@@ -42,9 +50,15 @@ const App: React.FC = () => {
     if (isInitialMount.current || !state || !isDBConfigured()) return;
 
     const timer = setTimeout(async () => {
-      setIsSyncing(true);
-      await saveStateToDB(state);
-      setIsSyncing(false);
+      try {
+        setIsSyncing(true);
+        await saveStateToDB(state);
+        setIsSyncing(false);
+      } catch (err) {
+        setIsSyncing(false);
+        console.error("Sync error:", err);
+        // Non blocchiamo l'app per errori di sync temporanei, ma logghiamo
+      }
     }, 1000);
 
     return () => clearTimeout(timer);
@@ -59,7 +73,7 @@ const App: React.FC = () => {
       wins: 0,
       losses: 0,
       basePoints: basePoints || 0,
-      matchPoints: 0, // Punti match iniziali a 0
+      matchPoints: 0,
       lastActive: Date.now()
     };
     setState(prev => prev ? ({ ...prev, players: [...prev.players, newPlayer] }) : null);
@@ -268,21 +282,35 @@ const App: React.FC = () => {
   if (dbError) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-red-100 text-center">
+        <div className="max-w-xl w-full bg-white rounded-2xl shadow-xl p-8 border border-red-100">
           <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h2 className="text-xl font-black text-slate-800 uppercase italic mb-2">Errore Configurazione</h2>
-          <p className="text-slate-500 text-sm mb-6 leading-relaxed">{dbError}</p>
-          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-slate-50 p-4 rounded-lg text-left">
-            Istruzioni:<br/>
-            1. Crea un progetto su supabase.com<br/>
-            2. Vai in Settings &gt; API<br/>
-            3. Copia Project URL e Anon Key<br/>
-            4. Inseriscili nelle variabili d'ambiente di Vercel
+          <h2 className="text-xl font-black text-slate-800 uppercase italic mb-2 text-center">{dbError.message}</h2>
+          
+          <div className="mt-6 bg-red-50 p-4 rounded-lg border border-red-100">
+            <h3 className="text-[10px] font-black uppercase text-red-600 mb-2">Dettagli Tecnici</h3>
+            <code className="text-[11px] font-mono text-red-800 break-words block whitespace-pre-wrap">
+              {dbError.details || "Nessun dettaglio aggiuntivo disponibile."}
+            </code>
           </div>
+
+          <div className="mt-6 text-[10px] text-slate-500 font-bold uppercase tracking-widest bg-slate-50 p-4 rounded-lg">
+            Istruzioni per risolvere:<br/>
+            1. Verifica di aver creato un progetto su supabase.com<br/>
+            2. Controlla che le variabili VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY siano impostate correttamente su Vercel<br/>
+            3. Assicurati che l'API key non sia scaduta o disattivata<br/>
+            4. Se l'errore è "table not found", assicurati di aver creato la tabella "app_data"
+          </div>
+          
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-6 w-full py-3 bg-slate-900 text-white rounded-xl font-black uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-lg"
+          >
+            Riprova Connessione
+          </button>
         </div>
       </div>
     );
