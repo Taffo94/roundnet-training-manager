@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Player, MatchmakingMode, AppState, TrainingSession, Gender } from './types';
 import { loadState, saveState } from './services/storage';
 import { generateRound, calculateNewRatings } from './services/matchmaking';
@@ -19,28 +19,28 @@ const Logo = () => (
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => loadState());
 
-  // Salva lo stato ogni volta che cambia
   useEffect(() => {
     saveState(state);
   }, [state]);
 
-  const addPlayer = (name: string, gender: Gender, points: number) => {
+  const addPlayer = (name: string, gender: Gender, basePoints: number) => {
     const newPlayer: Player = {
       id: Math.random().toString(36).substr(2, 9),
       name,
       gender,
       wins: 0,
       losses: 0,
-      points: points || 1200,
+      basePoints: basePoints || 0,
+      matchPoints: 1200,
       lastActive: Date.now()
     };
     setState(prev => ({ ...prev, players: [...prev.players, newPlayer] }));
   };
 
-  const updatePlayer = (id: string, name: string, gender: Gender, points: number) => {
+  const updatePlayer = (id: string, name: string, gender: Gender, basePoints: number, matchPoints: number) => {
     setState(prev => ({
       ...prev,
-      players: prev.players.map(p => p.id === id ? { ...p, name, gender, points } : p)
+      players: prev.players.map(p => p.id === id ? { ...p, name, gender, basePoints, matchPoints } : p)
     }));
   };
 
@@ -53,10 +53,10 @@ const App: React.FC = () => {
     }
   };
 
-  const startNewSession = (participantIds: string[]) => {
+  const startNewSession = (participantIds: string[], date: number) => {
     const newSession: TrainingSession = {
       id: Math.random().toString(36).substr(2, 9),
-      date: Date.now(),
+      date,
       participantIds,
       rounds: [],
       status: 'ACTIVE'
@@ -72,10 +72,8 @@ const App: React.FC = () => {
     setState(prev => {
       const session = prev.sessions.find(s => s.id === sessionId);
       if (!session) return prev;
-
       const participants = prev.players.filter(p => session.participantIds.includes(p.id));
       const newRound = generateRound(participants, mode, session.rounds.length + 1, session.rounds);
-      
       return {
         ...prev,
         sessions: prev.sessions.map(s => s.id === sessionId ? { ...s, rounds: [...s.rounds, newRound] } : s)
@@ -110,18 +108,14 @@ const App: React.FC = () => {
               ...r,
               matches: r.matches.map(m => {
                 if (m.id !== matchId) return m;
-                
                 const p1 = prev.players.find(p => p.id === m.team1.playerIds[0]);
                 const p2 = prev.players.find(p => p.id === m.team1.playerIds[1]);
                 const p3 = prev.players.find(p => p.id === m.team2.playerIds[0]);
                 const p4 = prev.players.find(p => p.id === m.team2.playerIds[1]);
-
                 if (!p1 || !p2 || !p3 || !p4) return m;
-
                 const result = calculateNewRatings(p1, p2, p3, p4, s1, s2);
                 playersToUpdate = result.players;
                 finalDelta = result.delta;
-
                 return { 
                   ...m, 
                   status: 'COMPLETED' as const, 
@@ -146,25 +140,22 @@ const App: React.FC = () => {
 
   const reopenMatch = (sessionId: string, roundId: string, matchId: string) => {
     if (!window.confirm("Riaprire la partita? I punti assegnati verranno stornati dal ranking.")) return;
-    
     setState(prev => {
       const session = prev.sessions.find(s => s.id === sessionId);
       const round = session?.rounds.find(r => r.id === roundId);
       const match = round?.matches.find(m => m.id === matchId);
-
       if (!match || match.status !== 'COMPLETED') return prev;
 
       const delta = match.pointsDelta || 0;
       const win1 = (match.team1.score || 0) > (match.team2.score || 0) ? 1 : 0;
       const win2 = 1 - win1;
 
-      // Storna i punti
       const revertedPlayers = prev.players.map(p => {
         if (match.team1.playerIds.includes(p.id)) {
-          return { ...p, points: p.points - delta, wins: p.wins - win1, losses: p.losses - win2 };
+          return { ...p, matchPoints: p.matchPoints - delta, wins: p.wins - win1, losses: p.losses - win2 };
         }
         if (match.team2.playerIds.includes(p.id)) {
-          return { ...p, points: p.points + delta, wins: p.wins - win2, losses: p.losses - win1 };
+          return { ...p, matchPoints: p.matchPoints + delta, wins: p.wins - win2, losses: p.losses - win1 };
         }
         return p;
       });
@@ -188,7 +179,6 @@ const App: React.FC = () => {
           })
         };
       });
-
       return { ...prev, players: revertedPlayers, sessions: updatedSessions };
     });
   };
@@ -246,7 +236,6 @@ const App: React.FC = () => {
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Roundnet Milano ASD</p>
             </div>
           </div>
-          
           <nav className="flex bg-slate-100 p-1 rounded-xl">
             {(['ranking', 'training', 'history'] as const).map(tab => (
               <button 
@@ -264,7 +253,6 @@ const App: React.FC = () => {
           </nav>
         </div>
       </header>
-
       <main className="flex-1 container mx-auto px-4 py-8">
         {state.currentTab === 'ranking' && (
           <PlayerList 
@@ -274,7 +262,6 @@ const App: React.FC = () => {
             onDeletePlayer={deletePlayer} 
           />
         )}
-
         {state.currentTab === 'training' && (
           <ActiveTraining 
             session={activeSession}
@@ -288,15 +275,17 @@ const App: React.FC = () => {
             onArchive={archiveSession}
           />
         )}
-
         {state.currentTab === 'history' && (
           <TrainingHistory 
             sessions={state.sessions.filter(s => s.status === 'ARCHIVED')}
             players={state.players}
+            onDeleteRound={deleteRound}
+            onUpdateScore={updateMatchScore}
+            onReopenMatch={reopenMatch}
+            onUpdatePlayers={updateMatchPlayers}
           />
         )}
       </main>
-
       <footer className="py-6 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest border-t border-slate-200">
         &copy; {new Date().getFullYear()} Roundnet Milano - Sistema Gestione Allenamenti
       </footer>

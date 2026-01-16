@@ -7,7 +7,8 @@ export interface Player {
   gender: Gender;
   wins: number;
   losses: number;
-  points: number;
+  basePoints: number; // Punti assegnati manualmente
+  matchPoints: number; // Punti derivanti dalle partite (inizia da 1200 o 0, usiamo 1200 come standard ELO)
   lastActive: number;
 }
 
@@ -31,7 +32,7 @@ export interface Match {
   status: 'PENDING' | 'COMPLETED';
   mode: MatchmakingMode;
   createdAt: number;
-  pointsDelta?: number; // Quanti punti sono stati aggiunti/tolti in questo match
+  pointsDelta?: number;
 }
 
 export interface Round {

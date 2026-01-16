@@ -25,10 +25,11 @@ export const getPointsDelta = (
   score1: number, score2: number
 ): number => {
   const K = 32;
-  const team1Avg = (p1.points + p2.points) / 2;
-  const team2Avg = (p3.points + p4.points) / 2;
+  // Il matchmaking e il delta si basano sul totale (base + match)
+  const t1Avg = ((p1.basePoints + p1.matchPoints) + (p2.basePoints + p2.matchPoints)) / 2;
+  const t2Avg = ((p3.basePoints + p3.matchPoints) + (p4.basePoints + p4.matchPoints)) / 2;
 
-  const expected1 = 1 / (1 + Math.pow(10, (team2Avg - team1Avg) / 400));
+  const expected1 = 1 / (1 + Math.pow(10, (t2Avg - t1Avg) / 400));
   const actual1 = score1 > score2 ? 1 : 0;
 
   return Math.round(K * (actual1 - expected1));
@@ -46,10 +47,10 @@ export const calculateNewRatings = (
   return {
     delta,
     players: [
-      { ...p1, points: p1.points + delta, wins: p1.wins + win1, losses: p1.losses + win2 },
-      { ...p2, points: p2.points + delta, wins: p2.wins + win1, losses: p2.losses + win2 },
-      { ...p3, points: p3.points - delta, wins: p3.wins + win2, losses: p3.losses + win1 },
-      { ...p4, points: p4.points - delta, wins: p4.wins + win2, losses: p4.losses + win1 },
+      { ...p1, matchPoints: p1.matchPoints + delta, wins: p1.wins + win1, losses: p1.losses + win2 },
+      { ...p2, matchPoints: p2.matchPoints + delta, wins: p2.wins + win1, losses: p2.losses + win2 },
+      { ...p3, matchPoints: p3.matchPoints - delta, wins: p3.wins + win2, losses: p3.losses + win1 },
+      { ...p4, matchPoints: p4.matchPoints - delta, wins: p4.wins + win2, losses: p4.losses + win1 },
     ]
   };
 };
@@ -79,6 +80,9 @@ export const generateRound = (
 
   const matches: Match[] = [];
   let playersToPair = [...activePlayers];
+
+  // Per il matchmaking usiamo la somma basePoints + matchPoints
+  const getTot = (p: Player) => p.basePoints + p.matchPoints;
 
   if (mode === MatchmakingMode.CUSTOM) {
     for (let i = 0; i < numMatches; i++) {
@@ -111,14 +115,14 @@ export const generateRound = (
       matches.push(createMatch(p[0], p[1], p[2], p[3], mode));
     }
   } else if (mode === MatchmakingMode.SAME_LEVEL) {
-    playersToPair.sort((a, b) => b.points - a.points);
+    playersToPair.sort((a, b) => getTot(b) - getTot(a));
     for (let i = 0; i < numMatches; i++) {
       const block = playersToPair.splice(0, 4);
       const shuffledBlock = shuffle(block);
       matches.push(createMatch(shuffledBlock[0], shuffledBlock[1], shuffledBlock[2], shuffledBlock[3], mode));
     }
   } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
-    playersToPair.sort((a, b) => b.points - a.points);
+    playersToPair.sort((a, b) => getTot(b) - getTot(a));
     for (let i = 0; i < numMatches; i++) {
       const block = playersToPair.splice(0, 4);
       matches.push(createMatch(block[0], block[3], block[1], block[2], mode));

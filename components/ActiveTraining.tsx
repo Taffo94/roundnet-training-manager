@@ -5,7 +5,7 @@ import { Player, TrainingSession, MatchmakingMode } from '../types';
 interface ActiveTrainingProps {
   session?: TrainingSession;
   players: Player[];
-  onStartSession: (ids: string[]) => void;
+  onStartSession: (ids: string[], date: number) => void;
   onAddRound: (sessionId: string, mode: MatchmakingMode) => void;
   onDeleteRound: (sessionId: string, roundId: string) => void;
   onUpdateScore: (sid: string, rid: string, mid: string, s1: number, s2: number) => void;
@@ -19,6 +19,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [matchScores, setMatchScores] = useState<Record<string, { s1: string, s2: string }>>({});
+  const [sessionDate, setSessionDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   const togglePlayer = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -30,7 +31,10 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
   const participants = session ? players.filter(p => session.participantIds.includes(p.id)) : [];
 
   const getTeamPoints = (ids: string[]) => {
-    return ids.reduce((acc, id) => acc + (getPlayer(id)?.points || 0), 0);
+    return ids.reduce((acc, id) => {
+      const p = getPlayer(id);
+      return acc + (p ? (p.basePoints + p.matchPoints) : 0);
+    }, 0);
   };
 
   if (!session) {
@@ -39,6 +43,24 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
         <div className="text-center">
           <h2 className="text-3xl font-black text-slate-800 uppercase italic">Nuovo Allenamento</h2>
           <p className="text-slate-500">Chi c'è oggi in campo?</p>
+        </div>
+
+        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col md:flex-row gap-6 items-center">
+          <div className="flex-1">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Data Allenamento</label>
+            <input 
+              type="date" 
+              value={sessionDate}
+              onChange={(e) => setSessionDate(e.target.value)}
+              className="w-full bg-white border border-slate-200 p-3 rounded-xl font-bold focus:ring-2 focus:ring-red-500 outline-none"
+            />
+          </div>
+          <div className="flex-none">
+            <div className="text-center p-3">
+              <span className="block text-2xl font-black text-slate-800">{selectedIds.length}</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase">Selezionati</span>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -52,7 +74,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
             >
               <span className="truncate">{p.name}</span>
               <span className={`text-[10px] mt-1 ${selectedIds.includes(p.id) ? 'text-white/60' : 'text-slate-400'}`}>
-                {p.gender} • {p.points}pt
+                {p.gender} • {p.basePoints + p.matchPoints}pt
               </span>
             </button>
           ))}
@@ -60,11 +82,11 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
 
         <div className="flex justify-center">
           <button
-            onClick={() => onStartSession(selectedIds)}
+            onClick={() => onStartSession(selectedIds, new Date(sessionDate).getTime())}
             disabled={selectedIds.length < 4}
-            className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:scale-105 transition-transform"
+            className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed hover:scale-105 transition-transform shadow-xl"
           >
-            Inizia ({selectedIds.length} Atleti)
+            Inizia Allenamento
           </button>
         </div>
       </div>
@@ -76,7 +98,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
       <div className="flex justify-between items-end border-b border-slate-200 pb-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 uppercase italic">Sessione Attiva</h2>
-          <p className="text-sm text-slate-500">{new Date(session.date).toLocaleDateString()} • {session.participantIds.length} Atleti</p>
+          <p className="text-sm text-slate-500">{new Date(session.date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })} • {session.participantIds.length} Atleti</p>
         </div>
         <button 
           onClick={() => {
@@ -120,19 +142,18 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                         </span>
                       </div>
                       {[0, 1].map(idx => (
-                        <div key={idx}>
-                          <select
-                            value={match.team1.playerIds[idx]}
-                            disabled={match.status === 'COMPLETED'}
-                            onChange={(e) => onUpdatePlayers(session.id, round.id, match.id, 1, idx as 0|1, e.target.value)}
-                            className="block w-full text-sm font-black bg-white border border-slate-200 rounded-lg p-2 focus:ring-2 focus:ring-red-500 outline-none appearance-none disabled:bg-transparent disabled:border-transparent disabled:p-0"
-                          >
-                            <option value="">Scegli Atleta...</option>
-                            {participants.map(p => (
-                              <option key={p.id} value={p.id}>{p.name} ({p.points})</option>
-                            ))}
-                          </select>
-                        </div>
+                        <select
+                          key={idx}
+                          value={match.team1.playerIds[idx]}
+                          disabled={match.status === 'COMPLETED'}
+                          onChange={(e) => onUpdatePlayers(session.id, round.id, match.id, 1, idx as 0|1, e.target.value)}
+                          className="block w-full text-sm font-black bg-white border border-slate-200 rounded-lg p-2 focus:ring-2 focus:ring-red-500 outline-none disabled:bg-transparent disabled:border-transparent disabled:p-0 appearance-none"
+                        >
+                          <option value="">Scegli Atleta...</option>
+                          {participants.map(p => (
+                            <option key={p.id} value={p.id}>{p.name} ({p.basePoints + p.matchPoints})</option>
+                          ))}
+                        </select>
                       ))}
                     </div>
                     <div className="space-y-3 text-right">
@@ -143,19 +164,18 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                         </span>
                       </div>
                       {[0, 1].map(idx => (
-                        <div key={idx}>
-                          <select
-                            value={match.team2.playerIds[idx]}
-                            disabled={match.status === 'COMPLETED'}
-                            onChange={(e) => onUpdatePlayers(session.id, round.id, match.id, 2, idx as 0|1, e.target.value)}
-                            className="block w-full text-sm font-black bg-white border border-slate-200 rounded-lg p-2 text-right focus:ring-2 focus:ring-red-500 outline-none appearance-none disabled:bg-transparent disabled:border-transparent disabled:p-0"
-                          >
-                            <option value="">Scegli Atleta...</option>
-                            {participants.map(p => (
-                              <option key={p.id} value={p.id}>{p.name} ({p.points})</option>
-                            ))}
-                          </select>
-                        </div>
+                        <select
+                          key={idx}
+                          value={match.team2.playerIds[idx]}
+                          disabled={match.status === 'COMPLETED'}
+                          onChange={(e) => onUpdatePlayers(session.id, round.id, match.id, 2, idx as 0|1, e.target.value)}
+                          className="block w-full text-sm font-black bg-white border border-slate-200 rounded-lg p-2 text-right focus:ring-2 focus:ring-red-500 outline-none disabled:bg-transparent disabled:border-transparent disabled:p-0 appearance-none"
+                        >
+                          <option value="">Scegli Atleta...</option>
+                          {participants.map(p => (
+                            <option key={p.id} value={p.id}>{p.name} ({p.basePoints + p.matchPoints})</option>
+                          ))}
+                        </select>
                       ))}
                     </div>
                   </div>
