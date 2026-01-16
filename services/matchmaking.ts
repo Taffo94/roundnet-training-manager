@@ -24,8 +24,9 @@ export const getPointsDelta = (
   p3: Player, p4: Player, 
   score1: number, score2: number
 ): number => {
+  if (score1 === score2) return 0; // Pareggio: nessun cambio punti
+
   const K = 32;
-  // Il matchmaking e il delta si basano sul totale (base + match)
   const t1Avg = ((p1.basePoints + p1.matchPoints) + (p2.basePoints + p2.matchPoints)) / 2;
   const t2Avg = ((p3.basePoints + p3.matchPoints) + (p4.basePoints + p4.matchPoints)) / 2;
 
@@ -41,6 +42,15 @@ export const calculateNewRatings = (
   score1: number, score2: number
 ): { players: Player[], delta: number } => {
   const delta = getPointsDelta(p1, p2, p3, p4, score1, score2);
+  
+  // Gestione pareggio per le statistiche
+  if (score1 === score2) {
+    return {
+      delta: 0,
+      players: [p1, p2, p3, p4]
+    };
+  }
+
   const win1 = score1 > score2 ? 1 : 0;
   const win2 = 1 - win1;
 
@@ -81,7 +91,6 @@ export const generateRound = (
   const matches: Match[] = [];
   let playersToPair = [...activePlayers];
 
-  // Per il matchmaking usiamo la somma basePoints + matchPoints
   const getTot = (p: Player) => p.basePoints + p.matchPoints;
 
   if (mode === MatchmakingMode.CUSTOM) {

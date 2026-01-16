@@ -20,6 +20,16 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
   const getPlayer = (id: string) => players.find(p => p.id === id);
   const getPlayerName = (id: string) => getPlayer(id)?.name || '???';
 
+  const renderStatusBadge = (teamScore: number, opponentScore: number) => {
+    if (teamScore > opponentScore) {
+      return <span className="w-3.5 h-3.5 rounded-full bg-green-500 text-white flex items-center justify-center text-[7px] font-black">W</span>;
+    } else if (teamScore < opponentScore) {
+      return <span className="w-3.5 h-3.5 rounded-full bg-red-500 text-white flex items-center justify-center text-[7px] font-black">L</span>;
+    } else {
+      return <span className="w-3.5 h-3.5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[7px] font-black">T</span>;
+    }
+  };
+
   if (sessions.length === 0) {
     return (
       <div className="text-center py-20 bg-white rounded-2xl border border-slate-200 shadow-sm">
@@ -95,11 +105,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                            <div className="space-y-1">
                               <div className="flex items-center gap-1">
                                 <span className="text-[8px] text-slate-400 uppercase">T1</span>
-                                {m.status === 'COMPLETED' && (
-                                  m.team1.score! > m.team2.score! 
-                                  ? <span className="w-3.5 h-3.5 rounded-full bg-green-500 text-white flex items-center justify-center text-[7px] font-black">W</span>
-                                  : <span className="w-3.5 h-3.5 rounded-full bg-red-500 text-white flex items-center justify-center text-[7px] font-black">L</span>
-                                )}
+                                {m.status === 'COMPLETED' && renderStatusBadge(m.team1.score!, m.team2.score!)}
                               </div>
                               {[0, 1].map(idx => (
                                 <select 
@@ -116,11 +122,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                            <div className="space-y-1 text-right">
                               <div className="flex items-center gap-1 flex-row-reverse">
                                 <span className="text-[8px] text-slate-400 uppercase">T2</span>
-                                {m.status === 'COMPLETED' && (
-                                  m.team2.score! > m.team1.score! 
-                                  ? <span className="w-3.5 h-3.5 rounded-full bg-green-500 text-white flex items-center justify-center text-[7px] font-black">W</span>
-                                  : <span className="w-3.5 h-3.5 rounded-full bg-red-500 text-white flex items-center justify-center text-[7px] font-black">L</span>
-                                )}
+                                {m.status === 'COMPLETED' && renderStatusBadge(m.team2.score!, m.team1.score!)}
                               </div>
                               {[0, 1].map(idx => (
                                 <select 
@@ -174,7 +176,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                                <button 
                                 onClick={() => {
                                   const sc = matchScores[m.id];
-                                  if(sc?.s1 && sc?.s2) onUpdateScore(session.id, round.id, m.id, parseInt(sc.s1), parseInt(sc.s2));
+                                  if(sc?.s1 !== undefined && sc?.s2 !== undefined && sc?.s1 !== '' && sc?.s2 !== '') onUpdateScore(session.id, round.id, m.id, parseInt(sc.s1), parseInt(sc.s2));
                                 }}
                                 className="bg-green-600 text-white px-3 py-1 rounded text-[10px] font-black uppercase hover:bg-green-700 transition-colors"
                                >OK</button>

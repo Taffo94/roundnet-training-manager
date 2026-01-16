@@ -37,6 +37,16 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
     }, 0);
   };
 
+  const renderStatusBadge = (teamScore: number, opponentScore: number) => {
+    if (teamScore > opponentScore) {
+      return <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm" title="Winner">W</span>;
+    } else if (teamScore < opponentScore) {
+      return <span className="w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm" title="Loser">L</span>;
+    } else {
+      return <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm" title="Tie">T</span>;
+    }
+  };
+
   if (!session) {
     return (
       <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-200 p-8 space-y-8">
@@ -138,11 +148,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Team 1</p>
-                          {match.status === 'COMPLETED' && (
-                            match.team1.score! > match.team2.score! 
-                            ? <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm" title="Winner">W</span>
-                            : <span className="w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm" title="Loser">L</span>
-                          )}
+                          {match.status === 'COMPLETED' && renderStatusBadge(match.team1.score!, match.team2.score!)}
                         </div>
                         <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
                           {getTeamPoints(match.team1.playerIds)} PT
@@ -167,11 +173,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                       <div className="flex justify-between items-center flex-row-reverse">
                         <div className="flex items-center gap-2 flex-row-reverse">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Team 2</p>
-                          {match.status === 'COMPLETED' && (
-                            match.team2.score! > match.team1.score! 
-                            ? <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm" title="Winner">W</span>
-                            : <span className="w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm" title="Loser">L</span>
-                          )}
+                          {match.status === 'COMPLETED' && renderStatusBadge(match.team2.score!, match.team1.score!)}
                         </div>
                         <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
                           {getTeamPoints(match.team2.playerIds)} PT
@@ -233,7 +235,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                         <button 
                           onClick={() => {
                             const sc = matchScores[match.id];
-                            if (sc?.s1 && sc?.s2) onUpdateScore(session.id, round.id, match.id, parseInt(sc.s1), parseInt(sc.s2));
+                            if (sc?.s1 !== undefined && sc?.s2 !== undefined && sc?.s1 !== '' && sc?.s2 !== '') onUpdateScore(session.id, round.id, match.id, parseInt(sc.s1), parseInt(sc.s2));
                           }}
                           disabled={!match.team1.playerIds[0] || !match.team1.playerIds[1] || !match.team2.playerIds[0] || !match.team2.playerIds[1]}
                           className="bg-red-600 text-white px-5 py-3 rounded-lg text-xs font-black uppercase hover:bg-red-700 transition-all shadow-md ml-2 disabled:opacity-30"

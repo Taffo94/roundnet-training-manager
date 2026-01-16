@@ -21,7 +21,7 @@ const InfoTooltip = ({ text, position = 'bottom' }: { text: string, position?: '
 
 const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdatePlayer, onDeletePlayer }) => {
   const [isEditing, setIsEditing] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: '', gender: 'M' as Gender, basePoints: 0, matchPoints: 1200 });
+  const [formData, setFormData] = useState({ name: '', gender: 'M' as Gender, basePoints: 0, matchPoints: 0 });
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -38,7 +38,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
     } else {
       onAddPlayer(formData.name.trim(), formData.gender, formData.basePoints);
     }
-    setFormData({ name: '', gender: 'M', basePoints: 0, matchPoints: 1200 });
+    setFormData({ name: '', gender: 'M', basePoints: 0, matchPoints: 0 });
   };
 
   const startEdit = (p: Player) => {
@@ -108,7 +108,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
               {isEditing ? 'Salva' : 'Aggiungi'}
             </button>
             {isEditing && (
-              <button type="button" onClick={() => { setIsEditing(null); setFormData({ name: '', gender: 'M', basePoints: 0, matchPoints: 1200 }); setError(null); }}
+              <button type="button" onClick={() => { setIsEditing(null); setFormData({ name: '', gender: 'M', basePoints: 0, matchPoints: 0 }); setError(null); }}
                 className="bg-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm font-bold uppercase hover:bg-slate-300"
               >Annulla</button>
             )}

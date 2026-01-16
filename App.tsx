@@ -59,7 +59,7 @@ const App: React.FC = () => {
       wins: 0,
       losses: 0,
       basePoints: basePoints || 0,
-      matchPoints: 1200,
+      matchPoints: 0, // Punti match iniziali a 0
       lastActive: Date.now()
     };
     setState(prev => prev ? ({ ...prev, players: [...prev.players, newPlayer] }) : null);
@@ -192,7 +192,7 @@ const App: React.FC = () => {
 
       const delta = match.pointsDelta || 0;
       const win1 = (match.team1.score || 0) > (match.team2.score || 0) ? 1 : 0;
-      const win2 = 1 - win1;
+      const win2 = (match.team2.score || 0) > (match.team1.score || 0) ? 1 : 0;
 
       const revertedPlayers = prev.players.map(p => {
         if (match.team1.playerIds.includes(p.id)) {
