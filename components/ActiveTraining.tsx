@@ -136,7 +136,14 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                   <div className="flex-1 grid grid-cols-2 gap-8 w-full">
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Team 1</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Team 1</p>
+                          {match.status === 'COMPLETED' && (
+                            match.team1.score! > match.team2.score! 
+                            ? <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm" title="Winner">W</span>
+                            : <span className="w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm" title="Loser">L</span>
+                          )}
+                        </div>
                         <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
                           {getTeamPoints(match.team1.playerIds)} PT
                         </span>
@@ -158,7 +165,14 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                     </div>
                     <div className="space-y-3 text-right">
                       <div className="flex justify-between items-center flex-row-reverse">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Team 2</p>
+                        <div className="flex items-center gap-2 flex-row-reverse">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Team 2</p>
+                          {match.status === 'COMPLETED' && (
+                            match.team2.score! > match.team1.score! 
+                            ? <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm" title="Winner">W</span>
+                            : <span className="w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm" title="Loser">L</span>
+                          )}
+                        </div>
                         <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
                           {getTeamPoints(match.team2.playerIds)} PT
                         </span>
@@ -184,7 +198,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                     {match.status === 'COMPLETED' ? (
                       <div className="flex items-center gap-3">
                         <div className="bg-slate-900 text-white px-5 py-2 rounded-xl font-black text-2xl italic min-w-[100px] text-center shadow-lg">
-                          {match.team1.score} : {match.team2.score}
+                          {match.team1.score} - {match.team2.score}
                         </div>
                         <button 
                           onClick={() => onReopenMatch(session.id, round.id, match.id)}
@@ -200,14 +214,18 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                         <input 
                           type="number" 
                           placeholder="0"
+                          min="0"
+                          max="50"
                           value={matchScores[match.id]?.s1 || ''}
                           onChange={e => setMatchScores(p => ({ ...p, [match.id]: { ...(p[match.id] || { s1: '', s2: '' }), s1: e.target.value } }))}
                           className="w-14 h-12 text-center font-black text-xl rounded-lg border-none focus:ring-2 focus:ring-red-500 outline-none bg-slate-50" 
                         />
-                        <span className="font-black text-slate-300">:</span>
+                        <span className="font-black text-slate-300">-</span>
                         <input 
                           type="number" 
                           placeholder="0"
+                          min="0"
+                          max="50"
                           value={matchScores[match.id]?.s2 || ''}
                           onChange={e => setMatchScores(p => ({ ...p, [match.id]: { ...(p[match.id] || { s1: '', s2: '' }), s2: e.target.value } }))}
                           className="w-14 h-12 text-center font-black text-xl rounded-lg border-none focus:ring-2 focus:ring-red-500 outline-none bg-slate-50" 

@@ -100,6 +100,10 @@ const App: React.FC = () => {
   };
 
   const updateMatchScore = (sessionId: string, roundId: string, matchId: string, s1: number, s2: number) => {
+    // Limitazione punti da 0 a 50
+    const clampedS1 = Math.min(Math.max(s1, 0), 50);
+    const clampedS2 = Math.min(Math.max(s2, 0), 50);
+
     setState(prev => {
       const session = prev.sessions.find(s => s.id === sessionId);
       if (!session) return prev;
@@ -122,14 +126,14 @@ const App: React.FC = () => {
                 const p3 = prev.players.find(p => p.id === m.team2.playerIds[0]);
                 const p4 = prev.players.find(p => p.id === m.team2.playerIds[1]);
                 if (!p1 || !p2 || !p3 || !p4) return m;
-                const result = calculateNewRatings(p1, p2, p3, p4, s1, s2);
+                const result = calculateNewRatings(p1, p2, p3, p4, clampedS1, clampedS2);
                 playersToUpdate = result.players;
                 finalDelta = result.delta;
                 return { 
                   ...m, 
                   status: 'COMPLETED' as const, 
-                  team1: { ...m.team1, score: s1 }, 
-                  team2: { ...m.team2, score: s2 },
+                  team1: { ...m.team1, score: clampedS1 }, 
+                  team2: { ...m.team2, score: clampedS2 },
                   pointsDelta: finalDelta
                 };
               })

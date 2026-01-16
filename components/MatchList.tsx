@@ -41,13 +41,11 @@ const MatchList: React.FC<MatchListProps> = ({ matches, players, onCompleteMatch
             <div className="flex-1 w-full grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Team 1</div>
-                {/* Fixed property access from .players to .playerIds */}
                 <div className="font-semibold text-slate-800 truncate">{getPlayerName(match.team1.playerIds[0])}</div>
                 <div className="font-semibold text-slate-800 truncate">{getPlayerName(match.team1.playerIds[1])}</div>
               </div>
               <div className="space-y-1 text-right">
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Team 2</div>
-                {/* Fixed property access from .players to .playerIds */}
                 <div className="font-semibold text-slate-800 truncate">{getPlayerName(match.team2.playerIds[0])}</div>
                 <div className="font-semibold text-slate-800 truncate">{getPlayerName(match.team2.playerIds[1])}</div>
               </div>
@@ -57,14 +55,18 @@ const MatchList: React.FC<MatchListProps> = ({ matches, players, onCompleteMatch
               <input
                 type="number"
                 placeholder="0"
+                min="0"
+                max="50"
                 value={scores[match.id]?.s1 || ''}
                 onChange={(e) => handleScoreChange(match.id, 's1', e.target.value)}
                 className="w-12 h-10 text-center font-bold text-xl rounded border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-red-500"
               />
-              <span className="text-slate-300 font-bold">:</span>
+              <span className="text-slate-300 font-bold">-</span>
               <input
                 type="number"
                 placeholder="0"
+                min="0"
+                max="50"
                 value={scores[match.id]?.s2 || ''}
                 onChange={(e) => handleScoreChange(match.id, 's2', e.target.value)}
                 className="w-12 h-10 text-center font-bold text-xl rounded border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-red-500"

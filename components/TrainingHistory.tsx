@@ -93,26 +93,42 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                        <div key={m.id} className="bg-white p-4 rounded-xl border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
                          <div className="flex-1 grid grid-cols-2 gap-4 text-xs font-bold w-full">
                            <div className="space-y-1">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[8px] text-slate-400 uppercase">T1</span>
+                                {m.status === 'COMPLETED' && (
+                                  m.team1.score! > m.team2.score! 
+                                  ? <span className="w-3.5 h-3.5 rounded-full bg-green-500 text-white flex items-center justify-center text-[7px] font-black">W</span>
+                                  : <span className="w-3.5 h-3.5 rounded-full bg-red-500 text-white flex items-center justify-center text-[7px] font-black">L</span>
+                                )}
+                              </div>
                               {[0, 1].map(idx => (
                                 <select 
                                   key={idx}
                                   value={m.team1.playerIds[idx]} 
                                   disabled={m.status === 'COMPLETED'}
                                   onChange={(e) => onUpdatePlayers(session.id, round.id, m.id, 1, idx as 0|1, e.target.value)}
-                                  className="w-full bg-slate-50 border-none p-1 rounded disabled:bg-transparent disabled:p-0 appearance-none"
+                                  className="w-full bg-slate-50 border-none p-1 rounded disabled:bg-transparent disabled:p-0 appearance-none font-bold"
                                 >
                                   {players.filter(p => session.participantIds.includes(p.id)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                 </select>
                               ))}
                            </div>
                            <div className="space-y-1 text-right">
+                              <div className="flex items-center gap-1 flex-row-reverse">
+                                <span className="text-[8px] text-slate-400 uppercase">T2</span>
+                                {m.status === 'COMPLETED' && (
+                                  m.team2.score! > m.team1.score! 
+                                  ? <span className="w-3.5 h-3.5 rounded-full bg-green-500 text-white flex items-center justify-center text-[7px] font-black">W</span>
+                                  : <span className="w-3.5 h-3.5 rounded-full bg-red-500 text-white flex items-center justify-center text-[7px] font-black">L</span>
+                                )}
+                              </div>
                               {[0, 1].map(idx => (
                                 <select 
                                   key={idx}
                                   value={m.team2.playerIds[idx]} 
                                   disabled={m.status === 'COMPLETED'}
                                   onChange={(e) => onUpdatePlayers(session.id, round.id, m.id, 2, idx as 0|1, e.target.value)}
-                                  className="w-full bg-slate-50 border-none p-1 rounded text-right disabled:bg-transparent disabled:p-0 appearance-none"
+                                  className="w-full bg-slate-50 border-none p-1 rounded text-right disabled:bg-transparent disabled:p-0 appearance-none font-bold"
                                 >
                                   {players.filter(p => session.participantIds.includes(p.id)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                 </select>
@@ -123,12 +139,12 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                          <div className="flex items-center gap-2">
                            {m.status === 'COMPLETED' ? (
                              <>
-                              <span className="font-black text-xl italic bg-slate-900 text-white px-4 py-1 rounded-lg">
-                                {m.team1.score} : {m.team2.score}
+                              <span className="font-black text-xl italic bg-slate-900 text-white px-4 py-1 rounded-lg shadow-md">
+                                {m.team1.score} - {m.team2.score}
                               </span>
                               <button 
                                 onClick={() => onReopenMatch(session.id, round.id, m.id)}
-                                className="p-1.5 text-slate-400 hover:text-red-500"
+                                className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -140,14 +156,18 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                                <input 
                                   type="number" 
                                   placeholder="0"
-                                  className="w-10 h-8 text-center font-bold bg-slate-100 rounded"
+                                  min="0"
+                                  max="50"
+                                  className="w-10 h-8 text-center font-bold bg-slate-100 rounded border-none focus:ring-2 focus:ring-red-500 outline-none"
                                   value={matchScores[m.id]?.s1 || ''}
                                   onChange={e => setMatchScores(p => ({...p, [m.id]: {...(p[m.id]||{s1:'',s2:''}), s1: e.target.value}}))}
                                 />
                                <input 
                                   type="number" 
                                   placeholder="0"
-                                  className="w-10 h-8 text-center font-bold bg-slate-100 rounded"
+                                  min="0"
+                                  max="50"
+                                  className="w-10 h-8 text-center font-bold bg-slate-100 rounded border-none focus:ring-2 focus:ring-red-500 outline-none"
                                   value={matchScores[m.id]?.s2 || ''}
                                   onChange={e => setMatchScores(p => ({...p, [m.id]: {...(p[m.id]||{s1:'',s2:''}), s2: e.target.value}}))}
                                 />
@@ -156,7 +176,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                                   const sc = matchScores[m.id];
                                   if(sc?.s1 && sc?.s2) onUpdateScore(session.id, round.id, m.id, parseInt(sc.s1), parseInt(sc.s2));
                                 }}
-                                className="bg-green-600 text-white px-3 py-1 rounded text-[10px] font-black uppercase"
+                                className="bg-green-600 text-white px-3 py-1 rounded text-[10px] font-black uppercase hover:bg-green-700 transition-colors"
                                >OK</button>
                              </div>
                            )}
