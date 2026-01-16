@@ -90,6 +90,15 @@ const App: React.FC = () => {
     }
   };
 
+  const deleteSession = (sessionId: string) => {
+    if (window.confirm("Sei sicuro di voler eliminare l'intera sessione? Questa azione non può essere annullata e i punti assegnati non verranno stornati automaticamente (riapri i match prima se necessario).")) {
+      setState(prev => ({
+        ...prev,
+        sessions: prev.sessions.filter(s => s.id !== sessionId)
+      }));
+    }
+  };
+
   const updateMatchScore = (sessionId: string, roundId: string, matchId: string, s1: number, s2: number) => {
     setState(prev => {
       const session = prev.sessions.find(s => s.id === sessionId);
@@ -280,6 +289,7 @@ const App: React.FC = () => {
             sessions={state.sessions.filter(s => s.status === 'ARCHIVED')}
             players={state.players}
             onDeleteRound={deleteRound}
+            onDeleteSession={deleteSession}
             onUpdateScore={updateMatchScore}
             onReopenMatch={reopenMatch}
             onUpdatePlayers={updateMatchPlayers}

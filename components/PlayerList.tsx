@@ -9,12 +9,12 @@ interface PlayerListProps {
   onDeletePlayer: (id: string) => void;
 }
 
-const InfoTooltip = ({ text }: { text: string }) => (
-  <span className="ml-1 cursor-help group relative">
+const InfoTooltip = ({ text, position = 'bottom' }: { text: string, position?: 'top' | 'bottom' }) => (
+  <span className="ml-1 cursor-help group relative inline-block">
     <span className="text-slate-400 font-bold bg-slate-100 rounded-full w-4 h-4 inline-flex items-center justify-center text-[10px]">?</span>
-    <span className="pointer-events-none absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 p-2 bg-slate-900 text-white text-[10px] font-normal normal-case rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-xl">
+    <span className={`pointer-events-none absolute ${position === 'bottom' ? 'bottom-full mb-2' : 'top-full mt-2'} left-1/2 -translate-x-1/2 w-48 p-2 bg-slate-900 text-white text-[10px] font-normal normal-case rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-[100] shadow-2xl`}>
       {text}
-      <span className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></span>
+      <span className={`absolute ${position === 'bottom' ? 'top-full border-t-slate-900' : 'bottom-full border-b-slate-900'} left-1/2 -translate-x-1/2 border-8 border-transparent`}></span>
     </span>
   </span>
 );
@@ -50,8 +50,8 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
   const sortedPlayers = [...players].sort((a, b) => (b.basePoints + b.matchPoints) - (a.basePoints + a.matchPoints));
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="p-6 bg-slate-50 border-b border-slate-200">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-visible relative z-10">
+      <div className="p-6 bg-slate-50 border-b border-slate-200 rounded-t-xl">
         <h2 className="font-black text-xl text-slate-800 uppercase italic mb-4">
           {isEditing ? 'Modifica Atleta' : 'Nuovo Atleta'}
         </h2>
@@ -80,7 +80,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
           <div className="w-24">
             <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
               Punti Base
-              <InfoTooltip text="Punti assegnati manualmente dal manager (es. per anzianità o premi)." />
+              <InfoTooltip text="Punti assegnati manualmente dal manager (es. per anzianità o premi)." position="bottom" />
             </label>
             <input
               type="number"
@@ -93,7 +93,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
             <div className="w-24">
               <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
                 Punti Match
-                <InfoTooltip text="Punti dinamici basati su vittorie e sconfitte (sistema ELO)." />
+                <InfoTooltip text="Punti dinamici basati su vittorie e sconfitte (sistema ELO)." position="bottom" />
               </label>
               <input
                 type="number"
@@ -117,7 +117,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
         {error && <p className="mt-2 text-xs font-bold text-red-600 uppercase tracking-tighter italic">! {error}</p>}
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-visible">
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold border-b border-slate-200">
             <tr>
@@ -126,11 +126,11 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
               <th className="px-6 py-3 text-center">Sesso</th>
               <th className="px-6 py-3 text-center">
                 Punti Base
-                <InfoTooltip text="Punti assegnati manualmente dal manager." />
+                <InfoTooltip text="Punti assegnati manualmente dal manager." position="top" />
               </th>
               <th className="px-6 py-3 text-center">
                 Punti Match
-                <InfoTooltip text="Punti guadagnati o persi durante le partite degli allenamenti." />
+                <InfoTooltip text="Punti guadagnati o persi durante le partite degli allenamenti." position="top" />
               </th>
               <th className="px-6 py-3 text-center">Totale</th>
               <th className="px-6 py-3 text-center">V / S</th>

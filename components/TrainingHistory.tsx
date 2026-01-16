@@ -6,13 +6,14 @@ interface TrainingHistoryProps {
   sessions: TrainingSession[];
   players: Player[];
   onDeleteRound: (sid: string, rid: string) => void;
+  onDeleteSession: (sid: string) => void;
   onUpdateScore: (sid: string, rid: string, mid: string, s1: number, s2: number) => void;
   onReopenMatch: (sid: string, rid: string, mid: string) => void;
   onUpdatePlayers: (sid: string, rid: string, mid: string, team: 1|2, index: 0|1, pid: string) => void;
 }
 
 const TrainingHistory: React.FC<TrainingHistoryProps> = ({ 
-  sessions, players, onDeleteRound, onUpdateScore, onReopenMatch, onUpdatePlayers 
+  sessions, players, onDeleteRound, onDeleteSession, onUpdateScore, onReopenMatch, onUpdatePlayers 
 }) => {
   const [matchScores, setMatchScores] = useState<Record<string, { s1: string, s2: string }>>({});
   
@@ -41,11 +42,25 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                 {session.participantIds.length} Atleti • {session.rounds.length} Round
               </div>
             </div>
-            <span className="text-slate-300 group-open:rotate-180 transition-transform">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </span>
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  onDeleteSession(session.id);
+                }}
+                className="text-slate-300 hover:text-red-600 transition-colors p-1"
+                title="Elimina intera sessione"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+              <span className="text-slate-300 group-open:rotate-180 transition-transform">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </span>
+            </div>
           </summary>
           <div className="p-6 border-t border-slate-100 bg-slate-50 space-y-8">
             <div className="flex flex-wrap gap-2">
