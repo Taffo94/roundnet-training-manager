@@ -78,7 +78,6 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
     <div className="space-y-8 max-w-5xl mx-auto">
       <div className="flex justify-between items-end border-b border-slate-200 pb-4">
         <h2 className="text-2xl font-black text-slate-800 uppercase italic">Sessione Attiva</h2>
-        {/* Fix: Call onArchive from props instead of the non-existent archiveSession */}
         <button onClick={() => onArchive(session.id)} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-bold uppercase transition-all shadow-md">Termina Sessione</button>
       </div>
       <div className="space-y-12">
@@ -92,37 +91,69 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
               {round.matches.map(match => (
                 <div key={match.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col md:flex-row items-center gap-6">
                   <div className="flex-1 grid grid-cols-2 gap-8 w-full">
+                    {/* Team 1 */}
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">T1 {match.status === 'COMPLETED' && renderStatusBadge(match.team1.score!, match.team2.score!)}</span>
                         <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{getTeamPoints(match.team1.playerIds)} PT</span>
                       </div>
                       {match.team1.playerIds.map((id, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <button onClick={() => onSelectPlayer(id)} className="text-sm font-black text-slate-800 hover:text-red-600 underline decoration-slate-200 underline-offset-2 transition-colors truncate">{getPlayerName(id)}</button>
+                        <div key={idx} className="flex flex-col gap-1">
+                          {match.status === 'PENDING' ? (
+                            <select 
+                              value={id}
+                              onChange={(e) => onUpdatePlayers(session.id, round.id, match.id, 1, idx as 0|1, e.target.value)}
+                              className="text-[11px] font-bold p-1 bg-white border border-slate-200 rounded outline-none focus:ring-1 focus:ring-red-500"
+                            >
+                              {participants.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <button onClick={() => onSelectPlayer(id)} className="text-sm font-black text-slate-800 hover:text-red-600 underline decoration-slate-200 underline-offset-2 transition-colors truncate text-left">{getPlayerName(id)}</button>
+                          )}
                         </div>
                       ))}
                     </div>
+
+                    {/* Team 2 */}
                     <div className="space-y-3 text-right">
                       <div className="flex justify-between items-center flex-row-reverse">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 flex-row-reverse">T2 {match.status === 'COMPLETED' && renderStatusBadge(match.team2.score!, match.team1.score!)}</span>
                         <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{getTeamPoints(match.team2.playerIds)} PT</span>
                       </div>
                       {match.team2.playerIds.map((id, idx) => (
-                        <div key={idx} className="flex items-center justify-end gap-2">
-                          <button onClick={() => onSelectPlayer(id)} className="text-sm font-black text-slate-800 hover:text-red-600 underline decoration-slate-200 underline-offset-2 transition-colors truncate">{getPlayerName(id)}</button>
+                        <div key={idx} className="flex flex-col gap-1">
+                          {match.status === 'PENDING' ? (
+                            <select 
+                              value={id}
+                              onChange={(e) => onUpdatePlayers(session.id, round.id, match.id, 2, idx as 0|1, e.target.value)}
+                              className="text-[11px] font-bold p-1 bg-white border border-slate-200 rounded outline-none focus:ring-1 focus:ring-red-500"
+                            >
+                              {participants.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <button onClick={() => onSelectPlayer(id)} className="text-sm font-black text-slate-800 hover:text-red-600 underline decoration-slate-200 underline-offset-2 transition-colors truncate text-right">{getPlayerName(id)}</button>
+                          )}
                         </div>
                       ))}
                     </div>
                   </div>
+
+                  {/* Score & Controls */}
                   <div className="flex items-center gap-2">
                     {match.status === 'COMPLETED' ? (
-                      <div className="bg-slate-900 text-white px-5 py-2 rounded-xl font-black text-2xl italic shadow-lg">{match.team1.score} - {match.team2.score}</div>
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="bg-slate-900 text-white px-5 py-2 rounded-xl font-black text-2xl italic shadow-lg">{match.team1.score} - {match.team2.score}</div>
+                        <button onClick={() => onReopenMatch(session.id, round.id, match.id)} className="text-[9px] font-black uppercase text-slate-400 hover:text-red-600 tracking-widest">Modifica</button>
+                      </div>
                     ) : (
                       <div className="flex gap-2 bg-white p-2 rounded-xl border border-slate-200">
                         <input type="number" placeholder="0" className="w-12 h-10 text-center font-black rounded border-none bg-slate-50 outline-none" onChange={e => setMatchScores(p => ({ ...p, [match.id]: { ...(p[match.id] || { s1: '', s2: '' }), s1: e.target.value } }))} />
                         <input type="number" placeholder="0" className="w-12 h-10 text-center font-black rounded border-none bg-slate-50 outline-none" onChange={e => setMatchScores(p => ({ ...p, [match.id]: { ...(p[match.id] || { s1: '', s2: '' }), s2: e.target.value } }))} />
-                        <button onClick={() => { const sc = matchScores[match.id]; if(sc?.s1 && sc?.s2) onUpdateScore(session.id, round.id, match.id, parseInt(sc.s1), parseInt(sc.s2)); }} className="bg-red-600 text-white px-4 py-2 rounded-lg text-xs font-black uppercase">Ok</button>
+                        <button onClick={() => { const sc = matchScores[match.id]; if(sc?.s1 && sc?.s2) onUpdateScore(session.id, round.id, match.id, parseInt(sc.s1), parseInt(sc.s2)); }} className="bg-red-600 text-white px-4 py-2 rounded-lg text-xs font-black uppercase">Salva</button>
                       </div>
                     )}
                   </div>

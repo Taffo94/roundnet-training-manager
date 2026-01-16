@@ -105,7 +105,18 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
               <th className="px-6 py-3">Rank</th>
               <th className="px-6 py-3">Atleta</th>
               <th className="px-6 py-3 text-center">Sesso</th>
-              <th className="px-6 py-3 text-center text-red-600 font-black italic">Totale</th>
+              <th className="px-6 py-3 text-center">
+                Punti Base
+                <InfoTooltip text="Punti iniziali assegnati in base al livello tecnico stimato." />
+              </th>
+              <th className="px-6 py-3 text-center">
+                Match
+                <InfoTooltip text="Punti accumulati o persi durante le partite di allenamento (Sistema Elo)." />
+              </th>
+              <th className="px-6 py-3 text-center text-red-600 font-black italic">
+                Totale
+                <InfoTooltip text="La somma di Punti Base e Punti Match che determina la posizione in classifica." />
+              </th>
               <th className="px-6 py-3 text-center">V / S</th>
               <th className="px-6 py-3"></th>
             </tr>
@@ -124,6 +135,12 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
                 </td>
                 <td className="px-6 py-4 text-center">
                   <span className={`text-[10px] font-black px-2 py-1 rounded ${player.gender === 'M' ? 'bg-blue-50 text-blue-600' : 'bg-pink-50 text-pink-600'}`}>{player.gender}</span>
+                </td>
+                <td className="px-6 py-4 text-center font-medium text-slate-500">
+                  {player.basePoints}
+                </td>
+                <td className="px-6 py-4 text-center font-medium text-slate-500">
+                  {player.matchPoints > 0 ? `+${player.matchPoints}` : player.matchPoints}
                 </td>
                 <td className="px-6 py-4 text-center">
                   <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full text-sm font-black italic">{player.basePoints + player.matchPoints}</span>
