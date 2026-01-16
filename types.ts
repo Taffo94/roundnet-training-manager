@@ -8,7 +8,7 @@ export interface Player {
   wins: number;
   losses: number;
   basePoints: number; // Punti assegnati manualmente
-  matchPoints: number; // Punti derivanti dalle partite (inizia da 1200 o 0, usiamo 1200 come standard ELO)
+  matchPoints: number; // Punti derivanti dalle partite
   lastActive: number;
 }
 
@@ -54,5 +54,6 @@ export interface TrainingSession {
 export interface AppState {
   players: Player[];
   sessions: TrainingSession[];
-  currentTab: 'ranking' | 'training' | 'history';
+  currentTab: 'ranking' | 'training' | 'history' | 'stats';
+  selectedPlayerId: string | null;
 }

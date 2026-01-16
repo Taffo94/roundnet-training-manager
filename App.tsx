@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, MatchmakingMode, AppState, TrainingSession, Gender } from './types';
 import { loadStateFromDB, saveStateToDB, isDBConfigured, getSupabaseConfig } from './services/storage';
@@ -5,6 +6,7 @@ import { generateRound, calculateNewRatings } from './services/matchmaking';
 import PlayerList from './components/PlayerList';
 import ActiveTraining from './components/ActiveTraining';
 import TrainingHistory from './components/TrainingHistory';
+import PlayerStats from './components/PlayerStats';
 
 const Logo = () => (
   <svg viewBox="0 0 100 120" className="h-12 w-12" xmlns="http://www.w3.org/2000/svg">
@@ -27,18 +29,23 @@ const App: React.FC = () => {
     if (!isDBConfigured()) {
       setDbError({
         message: "Configurazione Cloud mancante",
-        details: `Variabili rilevate: URL=${config.url || 'Mancante'}, KEY=${config.hasKey ? 'Presente' : 'Mancante'}. Assicurati di aver impostato VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.`
+        details: `Variabili rilevate: URL=${config.url || 'Mancante'}, KEY=${config.hasKey ? 'Presente' : 'Mancante'}.`
       });
       return;
     }
 
     loadStateFromDB()
       .then(data => {
-        setState(data);
+        // Migrazione se necessario per nuovi campi
+        const loadedState = {
+          ...data,
+          selectedPlayerId: data.selectedPlayerId || null,
+          currentTab: data.currentTab || 'ranking'
+        } as AppState;
+        setState(loadedState);
         isInitialMount.current = false;
       })
       .catch((err) => {
-        console.error("Load Error:", err);
         setDbError({
           message: "Errore di connessione al database",
           details: err instanceof Error ? err.message : JSON.stringify(err)
@@ -48,7 +55,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (isInitialMount.current || !state || !isDBConfigured()) return;
-
     const timer = setTimeout(async () => {
       try {
         setIsSyncing(true);
@@ -56,13 +62,14 @@ const App: React.FC = () => {
         setIsSyncing(false);
       } catch (err) {
         setIsSyncing(false);
-        console.error("Sync error:", err);
-        // Non blocchiamo l'app per errori di sync temporanei, ma logghiamo
       }
     }, 1000);
-
     return () => clearTimeout(timer);
   }, [state]);
+
+  const viewPlayerStats = (playerId: string) => {
+    setState(prev => prev ? ({ ...prev, currentTab: 'stats', selectedPlayerId: playerId }) : null);
+  };
 
   const addPlayer = (name: string, gender: Gender, basePoints: number) => {
     if (!state) return;
@@ -87,7 +94,7 @@ const App: React.FC = () => {
   };
 
   const deletePlayer = (id: string) => {
-    if (window.confirm("Sei sicuro di voler eliminare definitivamente questo atleta?")) {
+    if (window.confirm("Sei sicuro?")) {
       setState(prev => prev ? ({
         ...prev,
         players: prev.players.filter(p => p.id !== id)
@@ -125,7 +132,7 @@ const App: React.FC = () => {
   };
 
   const deleteRound = (sessionId: string, roundId: string) => {
-    if (window.confirm("Eliminare questo round e tutte le sue partite?")) {
+    if (window.confirm("Eliminare round?")) {
       setState(prev => prev ? ({
         ...prev,
         sessions: prev.sessions.map(s => s.id === sessionId ? { ...s, rounds: s.rounds.filter(r => r.id !== roundId) } : s)
@@ -134,7 +141,7 @@ const App: React.FC = () => {
   };
 
   const deleteSession = (sessionId: string) => {
-    if (window.confirm("Sei sicuro di voler eliminare l'intera sessione?")) {
+    if (window.confirm("Eliminare sessione?")) {
       setState(prev => prev ? ({
         ...prev,
         sessions: prev.sessions.filter(s => s.id !== sessionId)
@@ -144,17 +151,12 @@ const App: React.FC = () => {
 
   const updateMatchScore = (sessionId: string, roundId: string, matchId: string, s1: number, s2: number) => {
     if (!state) return;
-    const clampedS1 = Math.min(Math.max(s1, 0), 50);
-    const clampedS2 = Math.min(Math.max(s2, 0), 50);
-
     setState(prev => {
       if (!prev) return null;
       const session = prev.sessions.find(s => s.id === sessionId);
       if (!session) return prev;
-
       let playersToUpdate: Player[] = [];
       let finalDelta = 0;
-
       const updatedSessions = prev.sessions.map(s => {
         if (s.id !== sessionId) return s;
         return {
@@ -170,54 +172,39 @@ const App: React.FC = () => {
                 const p3 = prev.players.find(p => p.id === m.team2.playerIds[0]);
                 const p4 = prev.players.find(p => p.id === m.team2.playerIds[1]);
                 if (!p1 || !p2 || !p3 || !p4) return m;
-                const result = calculateNewRatings(p1, p2, p3, p4, clampedS1, clampedS2);
+                const result = calculateNewRatings(p1, p2, p3, p4, s1, s2);
                 playersToUpdate = result.players;
                 finalDelta = result.delta;
-                return { 
-                  ...m, 
-                  status: 'COMPLETED' as const, 
-                  team1: { ...m.team1, score: clampedS1 }, 
-                  team2: { ...m.team2, score: clampedS2 },
-                  pointsDelta: finalDelta
-                };
+                return { ...m, status: 'COMPLETED' as const, team1: { ...m.team1, score: s1 }, team2: { ...m.team2, score: s2 }, pointsDelta: finalDelta };
               })
             };
           })
         };
       });
-
       const updatedPlayers = prev.players.map(p => {
         const up = playersToUpdate.find(u => u.id === p.id);
         return up ? up : p;
       });
-
       return { ...prev, sessions: updatedSessions, players: updatedPlayers };
     });
   };
 
   const reopenMatch = (sessionId: string, roundId: string, matchId: string) => {
-    if (!window.confirm("Riaprire la partita? I punti verranno stornati.")) return;
+    if (!window.confirm("Riaprire partita?")) return;
     setState(prev => {
       if (!prev) return null;
       const session = prev.sessions.find(s => s.id === sessionId);
       const round = session?.rounds.find(r => r.id === roundId);
       const match = round?.matches.find(m => m.id === matchId);
       if (!match || match.status !== 'COMPLETED') return prev;
-
       const delta = match.pointsDelta || 0;
       const win1 = (match.team1.score || 0) > (match.team2.score || 0) ? 1 : 0;
       const win2 = (match.team2.score || 0) > (match.team1.score || 0) ? 1 : 0;
-
       const revertedPlayers = prev.players.map(p => {
-        if (match.team1.playerIds.includes(p.id)) {
-          return { ...p, matchPoints: p.matchPoints - delta, wins: p.wins - win1, losses: p.losses - win2 };
-        }
-        if (match.team2.playerIds.includes(p.id)) {
-          return { ...p, matchPoints: p.matchPoints + delta, wins: p.wins - win2, losses: p.losses - win1 };
-        }
+        if (match.team1.playerIds.includes(p.id)) return { ...p, matchPoints: p.matchPoints - delta, wins: p.wins - win1, losses: p.losses - win2 };
+        if (match.team2.playerIds.includes(p.id)) return { ...p, matchPoints: p.matchPoints + delta, wins: p.wins - win2, losses: p.losses - win1 };
         return p;
       });
-
       const updatedSessions = prev.sessions.map(s => {
         if (s.id !== sessionId) return s;
         return {
@@ -226,13 +213,7 @@ const App: React.FC = () => {
             if (r.id !== roundId) return r;
             return {
               ...r,
-              matches: r.matches.map(m => m.id === matchId ? { 
-                ...m, 
-                status: 'PENDING' as const, 
-                team1: { ...m.team1, score: undefined }, 
-                team2: { ...m.team2, score: undefined },
-                pointsDelta: undefined 
-              } : m)
+              matches: r.matches.map(m => m.id === matchId ? { ...m, status: 'PENDING' as const, team1: { ...m.team1, score: undefined }, team2: { ...m.team2, score: undefined }, pointsDelta: undefined } : m)
             };
           })
         };
@@ -244,37 +225,14 @@ const App: React.FC = () => {
   const updateMatchPlayers = (sessionId: string, roundId: string, matchId: string, team: 1|2, index: 0|1, newPlayerId: string) => {
     setState(prev => prev ? ({
       ...prev,
-      sessions: prev.sessions.map(s => {
-        if (s.id !== sessionId) return s;
-        return {
-          ...s,
-          rounds: s.rounds.map(r => {
-            if (r.id !== roundId) return r;
-            return {
-              ...r,
-              matches: r.matches.map(m => {
-                if (m.id !== matchId) return m;
-                const newPlayerIds = [...(team === 1 ? m.team1.playerIds : m.team2.playerIds)] as [string, string];
-                newPlayerIds[index] = newPlayerId;
-                return {
-                  ...m,
-                  team1: team === 1 ? { ...m.team1, playerIds: newPlayerIds } : m.team1,
-                  team2: team === 2 ? { ...m.team2, playerIds: newPlayerIds } : m.team2,
-                };
-              })
-            };
-          })
-        };
-      })
+      sessions: prev.sessions.map(s => s.id === sessionId ? { ...s, rounds: s.rounds.map(r => r.id === roundId ? { ...r, matches: r.matches.map(m => m.id === matchId ? { ...m, team1: team === 1 ? { ...m.team1, playerIds: index === 0 ? [newPlayerId, m.team1.playerIds[1]] : [m.team1.playerIds[0], newPlayerId] } : m.team1, team2: team === 2 ? { ...m.team2, playerIds: index === 0 ? [newPlayerId, m.team2.playerIds[1]] : [m.team2.playerIds[0], newPlayerId] } : m.team2 } : m) } : r) } : s)
     }) : null);
   };
 
   const archiveSession = (sessionId: string) => {
     setState(prev => prev ? ({
       ...prev,
-      sessions: prev.sessions.map(s => 
-        s.id === sessionId ? { ...s, status: 'ARCHIVED' as const } : s
-      ),
+      sessions: prev.sessions.map(s => s.id === sessionId ? { ...s, status: 'ARCHIVED' as const } : s),
       currentTab: 'history'
     }) : null);
   };
@@ -282,50 +240,16 @@ const App: React.FC = () => {
   if (dbError) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="max-w-xl w-full bg-white rounded-2xl shadow-xl p-8 border border-red-100">
-          <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-black text-slate-800 uppercase italic mb-2 text-center">{dbError.message}</h2>
-          
-          <div className="mt-6 bg-red-50 p-4 rounded-lg border border-red-100">
-            <h3 className="text-[10px] font-black uppercase text-red-600 mb-2">Dettagli Tecnici</h3>
-            <code className="text-[11px] font-mono text-red-800 break-words block whitespace-pre-wrap">
-              {dbError.details || "Nessun dettaglio aggiuntivo disponibile."}
-            </code>
-          </div>
-
-          <div className="mt-6 text-[10px] text-slate-500 font-bold uppercase tracking-widest bg-slate-50 p-4 rounded-lg">
-            Istruzioni per risolvere:<br/>
-            1. Verifica di aver creato un progetto su supabase.com<br/>
-            2. Controlla che le variabili VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY siano impostate correttamente su Vercel<br/>
-            3. Assicurati che l'API key non sia scaduta o disattivata<br/>
-            4. Se l'errore è "table not found", assicurati di aver creato la tabella "app_data"
-          </div>
-          
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-6 w-full py-3 bg-slate-900 text-white rounded-xl font-black uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-lg"
-          >
-            Riprova Connessione
-          </button>
+        <div className="max-w-xl w-full bg-white rounded-2xl shadow-xl p-8 border border-red-100 text-center">
+          <h2 className="text-xl font-black text-slate-800 uppercase italic mb-2">{dbError.message}</h2>
+          <code className="text-[11px] font-mono text-red-800 break-words block whitespace-pre-wrap bg-red-50 p-4 rounded-lg">{dbError.details}</code>
+          <button onClick={() => window.location.reload()} className="mt-6 w-full py-3 bg-slate-900 text-white rounded-xl font-black uppercase tracking-widest">Riprova</button>
         </div>
       </div>
     );
   }
 
-  if (!state) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
-          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Connessione Cloud...</p>
-        </div>
-      </div>
-    );
-  }
+  if (!state) return <div className="min-h-screen flex items-center justify-center">Caricamento...</div>;
 
   const activeSession = state.sessions.find(s => s.status === 'ACTIVE');
 
@@ -336,68 +260,33 @@ const App: React.FC = () => {
           <div className="flex items-center gap-3">
             <Logo />
             <div>
-              <h1 className="text-2xl font-black uppercase tracking-tighter italic leading-none text-slate-900 flex items-center gap-2">
-                RMI <span className="text-red-600">TRAINING</span>
-                {isSyncing && (
-                  <div className="w-2 h-2 rounded-full bg-green-500 sync-pulse" title="Sincronizzazione Cloud..."></div>
-                )}
-              </h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Database Centrale Condiviso</p>
+              <h1 className="text-2xl font-black uppercase tracking-tighter italic leading-none text-slate-900">RMI <span className="text-red-600">TRAINING</span></h1>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Database Cloud</p>
             </div>
           </div>
           <nav className="flex bg-slate-100 p-1 rounded-xl">
-            {(['ranking', 'training', 'history'] as const).map(tab => (
+            {(['ranking', 'training', 'history', 'stats'] as const).map(tab => (
               <button 
                 key={tab}
                 onClick={() => setState(p => p ? ({ ...p, currentTab: tab }) : null)}
-                className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${
-                  state.currentTab === tab 
-                    ? 'bg-white text-red-600 shadow-sm' 
-                    : 'text-slate-500 hover:text-slate-800'
+                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${
+                  state.currentTab === tab ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                {tab === 'ranking' ? 'Ranking' : tab === 'training' ? 'Allenamento' : 'Storico'}
+                {tab === 'ranking' ? 'Ranking' : tab === 'training' ? 'Allenamento' : tab === 'history' ? 'Storico' : 'Stats'}
               </button>
             ))}
           </nav>
         </div>
       </header>
       <main className="flex-1 container mx-auto px-4 py-8">
-        {state.currentTab === 'ranking' && (
-          <PlayerList 
-            players={state.players} 
-            onAddPlayer={addPlayer}
-            onUpdatePlayer={updatePlayer}
-            onDeletePlayer={deletePlayer} 
-          />
-        )}
-        {state.currentTab === 'training' && (
-          <ActiveTraining 
-            session={activeSession}
-            players={state.players}
-            onStartSession={startNewSession}
-            onAddRound={addRoundToSession}
-            onDeleteRound={deleteRound}
-            onUpdateScore={updateMatchScore}
-            onReopenMatch={reopenMatch}
-            onUpdatePlayers={updateMatchPlayers}
-            onArchive={archiveSession}
-          />
-        )}
-        {state.currentTab === 'history' && (
-          <TrainingHistory 
-            sessions={state.sessions.filter(s => s.status === 'ARCHIVED')}
-            players={state.players}
-            onDeleteRound={deleteRound}
-            onDeleteSession={deleteSession}
-            onUpdateScore={updateMatchScore}
-            onReopenMatch={reopenMatch}
-            onUpdatePlayers={updateMatchPlayers}
-          />
-        )}
+        {state.currentTab === 'ranking' && <PlayerList players={state.players} onAddPlayer={addPlayer} onUpdatePlayer={updatePlayer} onDeletePlayer={deletePlayer} onSelectPlayer={viewPlayerStats} />}
+        {state.currentTab === 'training' && <ActiveTraining session={activeSession} players={state.players} onStartSession={startNewSession} onAddRound={addRoundToSession} onDeleteRound={deleteRound} onUpdateScore={updateMatchScore} onReopenMatch={reopenMatch} onUpdatePlayers={updateMatchPlayers} onArchive={archiveSession} onSelectPlayer={viewPlayerStats} />}
+        {state.currentTab === 'history' && <TrainingHistory sessions={state.sessions.filter(s => s.status === 'ARCHIVED')} players={state.players} onDeleteRound={deleteRound} onDeleteSession={deleteSession} onUpdateScore={updateMatchScore} onReopenMatch={reopenMatch} onUpdatePlayers={updateMatchPlayers} onSelectPlayer={viewPlayerStats} />}
+        {state.currentTab === 'stats' && <PlayerStats players={state.players} sessions={state.sessions} selectedPlayerId={state.selectedPlayerId} onSelectPlayer={(id) => setState(p => p ? ({ ...p, selectedPlayerId: id }) : null)} />}
       </main>
-      <footer className="py-6 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest border-t border-slate-200">
-        &copy; {new Date().getFullYear()} Roundnet Milano - Sistema Cloud Centralizzato
+      <footer className="py-6 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest">
+        &copy; {new Date().getFullYear()} Roundnet Milano
       </footer>
     </div>
   );
