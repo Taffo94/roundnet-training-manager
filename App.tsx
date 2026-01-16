@@ -22,10 +22,9 @@ const App: React.FC = () => {
   const [dbError, setDbError] = useState<string | null>(null);
   const isInitialMount = useRef(true);
 
-  // Caricamento iniziale dal Database Cloud
   useEffect(() => {
     if (!isDBConfigured()) {
-      setDbError("Configurazione Supabase mancante. Assicurati di aver impostato SUPABASE_URL e SUPABASE_ANON_KEY nelle variabili d'ambiente.");
+      setDbError("Configurazione Cloud (Supabase) mancante nelle variabili d'ambiente.");
       return;
     }
 
@@ -34,13 +33,11 @@ const App: React.FC = () => {
         setState(data);
         isInitialMount.current = false;
       })
-      .catch(err => {
-        console.error(err);
-        setDbError("Impossibile connettersi al database. Verifica la console per i dettagli.");
+      .catch(() => {
+        setDbError("Errore di connessione al database cloud.");
       });
   }, []);
 
-  // Salvataggio automatico sul Cloud ad ogni modifica dello stato
   useEffect(() => {
     if (isInitialMount.current || !state || !isDBConfigured()) return;
 
@@ -282,9 +279,9 @@ const App: React.FC = () => {
           <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-slate-50 p-4 rounded-lg text-left">
             Istruzioni:<br/>
             1. Crea un progetto su supabase.com<br/>
-            2. Vai in Settings > API<br/>
+            2. Vai in Settings &gt; API<br/>
             3. Copia Project URL e Anon Key<br/>
-            4. Inseriscili nelle Environment Variables
+            4. Inseriscili nelle variabili d'ambiente di Vercel
           </div>
         </div>
       </div>
@@ -296,7 +293,7 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
-          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Connessione al Database Cloud...</p>
+          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Connessione Cloud...</p>
         </div>
       </div>
     );
@@ -317,7 +314,7 @@ const App: React.FC = () => {
                   <div className="w-2 h-2 rounded-full bg-green-500 sync-pulse" title="Sincronizzazione Cloud..."></div>
                 )}
               </h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Database Condiviso • Produzione</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Database Centrale Condiviso</p>
             </div>
           </div>
           <nav className="flex bg-slate-100 p-1 rounded-xl">
@@ -372,7 +369,7 @@ const App: React.FC = () => {
         )}
       </main>
       <footer className="py-6 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest border-t border-slate-200">
-        &copy; {new Date().getFullYear()} Roundnet Milano - Sistema Centralizzato Condiviso
+        &copy; {new Date().getFullYear()} Roundnet Milano - Sistema Cloud Centralizzato
       </footer>
     </div>
   );
