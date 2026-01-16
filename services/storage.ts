@@ -1,10 +1,9 @@
-
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { AppState } from '../types';
 
-// Variabili d'ambiente (configurate in Vercel)
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+// ✅ CORRETTO PER VITE
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 let supabase: SupabaseClient | null = null;
 
@@ -35,15 +34,14 @@ export const loadStateFromDB = async (): Promise<AppState> => {
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') { // Record non trovato
+      if (error.code === 'PGRST116') {
         await saveStateToDB(DEFAULT_STATE);
-        return DEFAULT_STATE;
       }
       return DEFAULT_STATE;
     }
 
     return (data.state as AppState) || DEFAULT_STATE;
-  } catch (err) {
+  } catch {
     return DEFAULT_STATE;
   }
 };
@@ -54,12 +52,12 @@ export const saveStateToDB = async (state: AppState) => {
   try {
     await supabase
       .from('app_data')
-      .upsert({ 
-        id: 1, 
-        state, 
-        updated_at: new Date().toISOString() 
+      .upsert({
+        id: 1,
+        state,
+        updated_at: new Date().toISOString()
       });
   } catch (err) {
-    console.error("Sync Error:", err);
+    console.error('Sync Error:', err);
   }
 };
