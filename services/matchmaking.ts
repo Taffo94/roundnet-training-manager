@@ -10,7 +10,7 @@ const shuffle = <T,>(array: T[]): T[] => {
   return newArray;
 };
 
-const createMatch = (p1: Player | {id:string}, p2: Player | {id:string}, p3: Player | {id:string}, p4: Player | {id:string}, mode: MatchmakingMode): Match => ({
+const createMatch = (p1: {id:string}, p2: {id:string}, p3: {id:string}, p4: {id:string}, mode: MatchmakingMode): Match => ({
   id: Math.random().toString(36).substr(2, 9),
   team1: { playerIds: [p1.id, p2.id] as [string, string] },
   team2: { playerIds: [p3.id, p4.id] as [string, string] },
@@ -24,7 +24,7 @@ export const getPointsDelta = (
   p3: Player, p4: Player, 
   score1: number, score2: number
 ): number => {
-  if (score1 === score2) return 0; // Pareggio: nessun cambio punti
+  if (score1 === score2) return 0;
 
   const K = 32;
   const t1Avg = ((p1.basePoints + p1.matchPoints) + (p2.basePoints + p2.matchPoints)) / 2;
@@ -43,12 +43,8 @@ export const calculateNewRatings = (
 ): { players: Player[], delta: number } => {
   const delta = getPointsDelta(p1, p2, p3, p4, score1, score2);
   
-  // Gestione pareggio per le statistiche
   if (score1 === score2) {
-    return {
-      delta: 0,
-      players: [p1, p2, p3, p4]
-    };
+    return { delta: 0, players: [p1, p2, p3, p4] };
   }
 
   const win1 = score1 > score2 ? 1 : 0;
@@ -100,17 +96,11 @@ export const generateRound = (
   } else if (mode === MatchmakingMode.GENDER_BALANCED) {
     const males = shuffle(playersToPair.filter(p => p.gender === 'M'));
     const females = shuffle(playersToPair.filter(p => p.gender === 'F'));
-    
     const mixedPairs: Player[][] = [];
-    while (males.length > 0 && females.length > 0) {
-      mixedPairs.push([males.pop()!, females.pop()!]);
-    }
+    while (males.length > 0 && females.length > 0) mixedPairs.push([males.pop()!, females.pop()!]);
     const remaining = [...males, ...females];
     const samePairs: Player[][] = [];
-    while (remaining.length >= 2) {
-      samePairs.push([remaining.pop()!, remaining.pop()!]);
-    }
-    
+    while (remaining.length >= 2) samePairs.push([remaining.pop()!, remaining.pop()!]);
     const allPairs = [...mixedPairs, ...samePairs];
     while (allPairs.length >= 2) {
       const t1 = allPairs.pop()!;
