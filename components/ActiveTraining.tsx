@@ -16,16 +16,40 @@ interface ActiveTrainingProps {
   onSelectPlayer: (id: string) => void;
 }
 
+const getNextMonday = () => {
+  const d = new Date();
+  const day = d.getDay();
+  // d.getDay() returns 0 for Sunday, 1 for Monday...
+  // If today is Monday (1), we stay on today. Otherwise, move to next Monday.
+  const diff = (day === 1) ? 0 : (1 - day + 7) % 7;
+  const nextMonday = new Date(d);
+  nextMonday.setDate(d.getDate() + diff);
+  return nextMonday.toISOString().split('T')[0];
+};
+
 const ActiveTraining: React.FC<ActiveTrainingProps> = ({ 
   session, players, onStartSession, onAddRound, onDeleteRound, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onArchive, onSelectPlayer 
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [matchScores, setMatchScores] = useState<Record<string, { s1: string, s2: string }>>({});
-  const [sessionDate, setSessionDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [sessionDate, setSessionDate] = useState<string>(getNextMonday());
 
   const togglePlayer = (id: string) => setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   const getPlayer = (id: string) => players.find(p => p.id === id);
   const participants = session ? players.filter(p => session.participantIds.includes(p.id)).sort((a,b) => a.name.localeCompare(b.name)) : [];
+
+  const getTeamPoints = (ids: string[]) => {
+    return ids.reduce((acc, id) => {
+      const p = getPlayer(id);
+      return acc + (p ? (p.basePoints + p.matchPoints) : 0);
+    }, 0);
+  };
+
+  const renderStatusBadge = (teamScore: number, opponentScore: number) => {
+    if (teamScore > opponentScore) return <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm">W</span>;
+    if (teamScore < opponentScore) return <span className="w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm">L</span>;
+    return <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[8px] font-black shadow-sm">T</span>;
+  };
 
   const getConflicts = (round: Round) => {
     const counts: Record<string, number> = {};
@@ -43,7 +67,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
       <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-200 p-8 space-y-8">
         <div className="text-center">
           <h2 className="text-3xl font-black text-slate-800 uppercase italic">Nuovo Allenamento</h2>
-          <p className="text-slate-500">Seleziona i presenti e imposta la data.</p>
+          <p className="text-slate-500">Seleziona i presenti e imposta la data (Default: Prossimo Lunedì).</p>
         </div>
         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Data Sessione</label>
@@ -88,37 +112,50 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                 {round.matches.map(m => (
                   <div key={m.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col md:flex-row items-center gap-6">
                     <div className="flex-1 grid grid-cols-2 gap-8 w-full">
-                      {[1, 2].map(t => (
-                        <div key={t} className={`space-y-3 ${t === 2 ? 'text-right' : ''}`}>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Team {t}</span>
-                          {(t === 1 ? m.team1.playerIds : m.team2.playerIds).map((id, idx) => (
-                            <div key={idx}>
-                              {m.status === 'PENDING' ? (
-                                <select 
-                                  value={id} 
-                                  onChange={(e) => onUpdatePlayers(session.id, round.id, m.id, t as 1|2, idx as 0|1, e.target.value)} 
-                                  className={`text-[11px] font-bold p-1 bg-white border rounded outline-none w-full ${conflicts.has(id) ? 'border-red-500 text-red-600 bg-red-50' : 'border-slate-200'}`}
-                                >
-                                  <option value="">Scegli...</option>
-                                  {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                </select>
-                              ) : (
-                                <button 
-                                  onClick={() => onSelectPlayer(id)} 
-                                  className={`text-sm font-black hover:text-red-600 truncate block w-full text-inherit ${conflicts.has(id) ? 'text-red-600 underline decoration-red-500' : 'text-slate-800'}`}
-                                >
-                                  {getPlayer(id)?.name || '???'}
-                                </button>
-                              )}
+                      {[1, 2].map(t => {
+                        const teamIds = t === 1 ? m.team1.playerIds : m.team2.playerIds;
+                        const oppScore = t === 1 ? m.team2.score : m.team1.score;
+                        const teamScore = t === 1 ? m.team1.score : m.team2.score;
+                        
+                        return (
+                          <div key={t} className={`space-y-3 ${t === 2 ? 'text-right' : ''}`}>
+                            <div className={`flex justify-between items-center ${t === 2 ? 'flex-row-reverse' : ''}`}>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                Team {t} {m.status === 'COMPLETED' && renderStatusBadge(teamScore!, oppScore!)}
+                              </span>
+                              <span className="text-[9px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+                                {getTeamPoints(teamIds)} PT
+                              </span>
                             </div>
-                          ))}
-                        </div>
-                      ))}
+                            {teamIds.map((id, idx) => (
+                              <div key={idx}>
+                                {m.status === 'PENDING' ? (
+                                  <select 
+                                    value={id} 
+                                    onChange={(e) => onUpdatePlayers(session.id, round.id, m.id, t as 1|2, idx as 0|1, e.target.value)} 
+                                    className={`text-[11px] font-bold p-1 bg-white border rounded outline-none w-full ${conflicts.has(id) ? 'border-red-500 text-red-600 bg-red-50' : 'border-slate-200'}`}
+                                  >
+                                    <option value="">Scegli...</option>
+                                    {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                  </select>
+                                ) : (
+                                  <button 
+                                    onClick={() => onSelectPlayer(id)} 
+                                    className={`text-sm font-black hover:text-red-600 truncate block w-full text-inherit ${t === 2 ? 'text-right' : 'text-left'} ${conflicts.has(id) ? 'text-red-600 underline decoration-red-500' : 'text-slate-800'}`}
+                                  >
+                                    {getPlayer(id)?.name || '???'}
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
                     </div>
                     <div className="flex items-center gap-2">
                       {m.status === 'COMPLETED' ? (
                         <div className="flex flex-col items-center">
-                          <div className="bg-slate-900 text-white px-5 py-2 rounded-xl font-black text-2xl italic">{m.team1.score} - {m.team2.score}</div>
+                          <div className="bg-slate-900 text-white px-5 py-2 rounded-xl font-black text-2xl italic shadow-lg">{m.team1.score} - {m.team2.score}</div>
                           <button onClick={() => onReopenMatch(session.id, round.id, m.id)} className="text-[9px] font-black uppercase text-slate-400 hover:text-red-600 mt-1">Modifica</button>
                         </div>
                       ) : (
