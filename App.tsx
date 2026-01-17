@@ -9,12 +9,15 @@ import TrainingHistory from './components/TrainingHistory';
 import PlayerStats from './components/PlayerStats';
 
 const Logo = () => (
-  <svg viewBox="0 0 100 120" className="h-12 w-12" xmlns="http://www.w3.org/2000/svg">
-    <path d="M10,40 L15,35 L15,40 M20,30 L25,25 L25,30 M30,20 L35,15 L35,20 M45,10 L50,5 L55,10 M65,20 L70,15 L70,20 M75,30 L80,25 L80,30 M85,40 L90,35 L90,40" stroke="black" strokeWidth="2" fill="none"/>
-    <path d="M15,40 L15,60 L85,60 L85,40 L75,30 L75,60 M65,20 L65,60 M55,10 L55,60 M45,10 L45,60 M35,20 L35,60 M25,30 L25,60" stroke="black" strokeWidth="2" fill="none"/>
-    <circle cx="50" cy="80" r="35" fill="#e11d48" />
-    <path d="M40,70 L65,70 L50,85 L65,100 M40,70 L40,100" stroke="white" strokeWidth="6" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
+  <img 
+    src="logo.png" 
+    alt="Roundnet Milano Logo" 
+    className="h-14 w-auto object-contain" 
+    onError={(e) => {
+      // Fallback in caso l'immagine non sia ancora presente nel path
+      (e.target as HTMLImageElement).style.opacity = '0.5';
+    }}
+  />
 );
 
 const App: React.FC = () => {
