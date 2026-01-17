@@ -9,6 +9,16 @@ interface PlayerStatsProps {
   onSelectPlayer: (id: string) => void;
 }
 
+const InfoTooltip = ({ text, position = 'bottom' }: { text: string, position?: 'top' | 'bottom' }) => (
+  <span className="ml-1 cursor-help group relative inline-block">
+    <span className="text-slate-400 font-bold bg-slate-100 rounded-full w-4 h-4 inline-flex items-center justify-center text-[10px]">?</span>
+    <span className={`pointer-events-none absolute ${position === 'bottom' ? 'bottom-full mb-2' : 'top-full mt-2'} left-1/2 -translate-x-1/2 w-48 p-2 bg-slate-900 text-white text-[10px] font-normal normal-case rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-[100] shadow-2xl`}>
+      {text}
+      <span className={`absolute ${position === 'bottom' ? 'top-full border-t-slate-900' : 'bottom-full border-b-slate-900'} left-1/2 -translate-x-1/2 border-8 border-transparent`}></span>
+    </span>
+  </span>
+);
+
 const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPlayerId, onSelectPlayer }) => {
   const selectedPlayer = players.find(p => p.id === selectedPlayerId);
 
@@ -38,7 +48,6 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
       const won = (myTeam.score || 0) > (opponentTeam.score || 0);
       const lost = (opponentTeam.score || 0) > (myTeam.score || 0);
 
-      // Partner Stats
       const partnerId = myTeam.playerIds.find(id => id !== selectedPlayerId);
       if (partnerId) {
         if (!partnerStats[partnerId]) partnerStats[partnerId] = { wins: 0, total: 0 };
@@ -46,7 +55,6 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
         if (won) partnerStats[partnerId].wins++;
       }
 
-      // Opponent Stats
       opponentTeam.playerIds.forEach(oppId => {
         if (!opponentStats[oppId]) opponentStats[oppId] = { losses: 0, total: 0 };
         opponentStats[oppId].total++;
@@ -54,7 +62,6 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
       });
     });
 
-    // Helper to find top player by a custom criteria
     const findTop = (data: Record<string, any>, criteria: (id: string, d: any) => number) => {
       let topId = '';
       let topVal = -1;
@@ -71,14 +78,6 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
       return player ? { ...player, ...data[topId], val: topVal } : null;
     };
 
-    const bestPartnerWins = findTop(partnerStats, (_, d) => d.wins);
-    const bestPartnerWR = findTop(partnerStats, (_, d) => d.wins / d.total);
-    const mostFrequentPartner = findTop(partnerStats, (_, d) => d.total);
-
-    const nemesisLosses = findTop(opponentStats, (_, d) => d.losses);
-    const nemesisLR = findTop(opponentStats, (_, d) => d.losses / d.total);
-    const mostFrequentOpponent = findTop(opponentStats, (_, d) => d.total);
-
     const totalWins = allMatches.filter(({match}) => {
       const isT1 = match.team1.playerIds.includes(selectedPlayerId);
       return isT1 ? (match.team1.score! > match.team2.score!) : (match.team2.score! > match.team1.score!);
@@ -91,23 +90,26 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
       winRate,
       recentMatches: allMatches.slice(0, 10),
       partners: {
-        wins: bestPartnerWins,
-        wr: bestPartnerWR,
-        freq: mostFrequentPartner
+        wins: findTop(partnerStats, (_, d) => d.wins),
+        wr: findTop(partnerStats, (_, d) => d.wins / d.total),
+        freq: findTop(partnerStats, (_, d) => d.total)
       },
       opponents: {
-        losses: nemesisLosses,
-        lr: nemesisLR,
-        freq: mostFrequentOpponent
+        losses: findTop(opponentStats, (_, d) => d.losses),
+        lr: findTop(opponentStats, (_, d) => d.losses / d.total),
+        freq: findTop(opponentStats, (_, d) => d.total)
       }
     };
   }, [selectedPlayerId, sessions, players]);
 
-  const StatCard = ({ title, player, subtitle, icon, color }: { title: string, player: any, subtitle: string, icon: string, color: string }) => (
+  const StatCard = ({ title, player, subtitle, icon, color, help }: { title: string, player: any, subtitle: string, icon: string, color: string, help: string }) => (
     <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-slate-300 transition-all">
-      <div className="flex items-center gap-3 mb-3">
-        <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center text-xl shadow-sm`}>{icon}</div>
-        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight">{title}</div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center text-xl shadow-sm`}>{icon}</div>
+          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight">{title}</div>
+        </div>
+        <InfoTooltip text={help} position="top" />
       </div>
       {player ? (
         <div>
@@ -143,23 +145,24 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
 
       {selectedPlayer && stats && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
-          {/* Header Stats */}
           <div className="bg-slate-900 text-white p-8 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-center gap-8 relative overflow-hidden">
              <div className="absolute top-0 right-0 p-4 opacity-10">
                 <svg viewBox="0 0 100 100" className="w-32 h-32 fill-white"><circle cx="50" cy="50" r="40"/></svg>
              </div>
-             <div className="relative z-10">
+             <div className="relative z-10 text-center md:text-left">
                 <h2 className="text-4xl font-black italic uppercase tracking-tighter mb-1">{selectedPlayer.name}</h2>
-                <div className="flex gap-4 text-xs font-bold uppercase tracking-widest text-slate-400">
+                <div className="flex gap-4 text-xs font-bold uppercase tracking-widest text-slate-400 justify-center md:justify-start">
                    <span>{selectedPlayer.gender === 'M' ? 'Uomo' : 'Donna'}</span>
                    <span>•</span>
                    <span>{selectedPlayer.basePoints + selectedPlayer.matchPoints} Punti Ranking</span>
                 </div>
              </div>
              <div className="flex gap-12 text-center relative z-10">
-                <div>
+                <div className="group relative">
                    <div className="text-4xl font-black italic text-red-500">{stats.winRate}%</div>
-                   <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Win Rate</div>
+                   <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center justify-center">
+                     Win Rate <InfoTooltip text="Percentuale di partite vinte su quelle totali disputate." position="top" />
+                   </div>
                 </div>
                 <div>
                    <div className="text-4xl font-black italic">{stats.totalMatches}</div>
@@ -168,7 +171,6 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
              </div>
           </div>
 
-          {/* Partner Stats */}
           <div className="space-y-4">
             <h3 className="text-sm font-black text-slate-800 uppercase italic tracking-widest border-l-4 border-green-500 pl-3">Compagni di Squadra</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -178,6 +180,7 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
                 subtitle={`${stats.partners.wins?.wins || 0} Vittorie insieme`}
                 icon="🤝" 
                 color="bg-green-50 text-green-600"
+                help="Il giocatore con cui hai ottenuto il maggior numero assoluto di vittorie."
               />
               <StatCard 
                 title="Affinità Tecnica" 
@@ -185,6 +188,7 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
                 subtitle={`${((stats.partners.wr?.wins / stats.partners.wr?.total) * 100 || 0).toFixed(0)}% Win Rate`}
                 icon="📈" 
                 color="bg-blue-50 text-blue-600"
+                help="Il compagno con cui hai la percentuale di vittoria più alta (minimo 1 partita)."
               />
               <StatCard 
                 title="Partner Fedele" 
@@ -192,11 +196,11 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
                 subtitle={`${stats.partners.freq?.total || 0} Partite giocate`}
                 icon="🔄" 
                 color="bg-slate-100 text-slate-600"
+                help="Il giocatore con cui sei stato accoppiato più spesso."
               />
             </div>
           </div>
 
-          {/* Opponent Stats */}
           <div className="space-y-4">
             <h3 className="text-sm font-black text-slate-800 uppercase italic tracking-widest border-l-4 border-red-500 pl-3">Avversari & Rivali</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -206,6 +210,7 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
                 subtitle={`Ti ha battuto ${stats.opponents.losses?.losses || 0} volte`}
                 icon="🔥" 
                 color="bg-red-50 text-red-600"
+                help="L'avversario che ti ha inflitto il maggior numero di sconfitte."
               />
               <StatCard 
                 title="Incubo" 
@@ -213,6 +218,7 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
                 subtitle={`${((stats.opponents.lr?.losses / stats.opponents.lr?.total) * 100 || 0).toFixed(0)}% Sconfitte`}
                 icon="💀" 
                 color="bg-orange-50 text-orange-600"
+                help="L'avversario contro cui hai la percentuale di sconfitta più alta."
               />
               <StatCard 
                 title="Rivale Storico" 
@@ -220,11 +226,11 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
                 subtitle={`${stats.opponents.freq?.total || 0} Scontri diretti`}
                 icon="⚔️" 
                 color="bg-slate-100 text-slate-600"
+                help="L'avversario che hai affrontato più volte in assoluto."
               />
             </div>
           </div>
 
-          {/* Recent Matches */}
           <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="px-8 py-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
               <h3 className="font-black text-slate-800 uppercase italic text-sm">Cronologia Recente (Ultimi 10)</h3>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Player, MatchmakingMode, AppState, TrainingSession, Gender, Match } from './types';
+import { Player, MatchmakingMode, AppState, TrainingSession, Gender, Match, Round } from './types';
 import { loadStateFromDB, saveStateToDB, isDBConfigured, getSupabaseConfig } from './services/storage';
 import { generateRound, calculateNewRatings } from './services/matchmaking';
 import PlayerList from './components/PlayerList';
@@ -61,6 +61,53 @@ const App: React.FC = () => {
     });
   };
 
+  const recalculateRanking = () => {
+    if (!state) return;
+    if (!window.confirm("Attenzione: questa operazione ricalcolerà tutti i punti basandosi cronologicamente sullo storico. Continuare?")) return;
+
+    setState(prev => {
+      if (!prev) return null;
+      
+      // 1. Reset all match stats
+      let updatedPlayers = prev.players.map(p => ({
+        ...p,
+        matchPoints: 0,
+        wins: 0,
+        losses: 0
+      }));
+
+      // 2. Sort sessions and matches chronologically
+      const allCompletedMatches: { match: Match; session: TrainingSession; round: Round }[] = [];
+      const sortedSessions = [...prev.sessions].sort((a, b) => a.date - b.date);
+
+      sortedSessions.forEach(s => {
+        const sortedRounds = [...s.rounds].sort((a, b) => a.roundNumber - b.roundNumber);
+        sortedRounds.forEach(r => {
+          r.matches.forEach(m => {
+            if (m.status === 'COMPLETED') {
+              allCompletedMatches.push({ match: m, session: s, round: r });
+            }
+          });
+        });
+      });
+
+      // 3. Re-apply all ratings
+      allCompletedMatches.forEach(({ match }) => {
+        const p1 = updatedPlayers.find(p => p.id === match.team1.playerIds[0]);
+        const p2 = updatedPlayers.find(p => p.id === match.team1.playerIds[1]);
+        const p3 = updatedPlayers.find(p => p.id === match.team2.playerIds[0]);
+        const p4 = updatedPlayers.find(p => p.id === match.team2.playerIds[1]);
+
+        if (p1 && p2 && p3 && p4) {
+          const result = calculateNewRatings(p1, p2, p3, p4, match.team1.score!, match.team2.score!);
+          updatedPlayers = updatedPlayers.map(p => result.players.find(u => u.id === p.id) || p);
+        }
+      });
+
+      return { ...prev, players: updatedPlayers };
+    });
+  };
+
   const updateMatchPlayers = (sessionId: string, roundId: string, matchId: string, team: 1|2, index: 0|1, newPid: string) => {
     setState(prev => {
       if (!prev) return null;
@@ -74,7 +121,6 @@ const App: React.FC = () => {
             if (!match) return r;
             const oldPid = team === 1 ? match.team1.playerIds[index] : match.team2.playerIds[index];
             
-            // Swap logic: if newPid is elsewhere in the round, swap with oldPid
             let resting = [...r.restingPlayerIds];
             if (resting.includes(newPid)) resting = resting.map(id => id === newPid ? oldPid : id);
 
@@ -230,7 +276,7 @@ const App: React.FC = () => {
         </div>
       </header>
       <main className="flex-1 container mx-auto px-4 py-8">
-        {state.currentTab === 'ranking' && <PlayerList players={state.players} onAddPlayer={(n, g, b) => setState(p => p ? ({ ...p, players: [...p.players, { id: Math.random().toString(36).substr(2, 9), name: n, gender: g, wins: 0, losses: 0, basePoints: b, matchPoints: 0, lastActive: Date.now() }] }) : null)} onUpdatePlayer={(id, n, g, b, m) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, name: n, gender: g, basePoints: b, matchPoints: m } : x) }) : null)} onDeletePlayer={(id) => window.confirm("Eliminare?") && setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null)} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} onResetPoints={resetAllPoints} />}
+        {state.currentTab === 'ranking' && <PlayerList players={state.players} onAddPlayer={(n, g, b) => setState(p => p ? ({ ...p, players: [...p.players, { id: Math.random().toString(36).substr(2, 9), name: n, gender: g, wins: 0, losses: 0, basePoints: b, matchPoints: 0, lastActive: Date.now() }] }) : null)} onUpdatePlayer={(id, n, g, b, m) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, name: n, gender: g, basePoints: b, matchPoints: m } : x) }) : null)} onDeletePlayer={(id) => window.confirm("Eliminare?") && setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null)} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} onResetPoints={resetAllPoints} onRecalculate={recalculateRanking} />}
         {state.currentTab === 'training' && <ActiveTraining session={state.sessions.find(s => s.status === 'ACTIVE')} players={state.players} onStartSession={(ids, date) => setState(p => p ? ({ ...p, sessions: [{ id: Math.random().toString(36).substr(2, 9), date, participantIds: ids, rounds: [], status: 'ACTIVE' }, ...p.sessions], currentTab: 'training' }) : null)} onAddRound={(sid, mode) => setState(prev => { if (!prev) return null; const s = prev.sessions.find(x => x.id === sid); if (!s) return prev; return { ...prev, sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: [...x.rounds, generateRound(prev.players.filter(p => s.participantIds.includes(p.id)), mode, x.rounds.length + 1, x.rounds)] } : x) }; })} onDeleteRound={deleteRound} onUpdateScore={updateMatchScore} onReopenMatch={reopenMatch} onUpdatePlayers={updateMatchPlayers} onUpdateResting={updateRestingPlayer} onArchive={(id) => setState(p => p ? ({ ...p, sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' } : x), currentTab: 'history' }) : null)} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} />}
         {state.currentTab === 'history' && <TrainingHistory sessions={state.sessions.filter(s => s.status === 'ARCHIVED')} players={state.players} onDeleteRound={deleteRound} onDeleteSession={deleteSession} onUpdateScore={updateMatchScore} onReopenMatch={reopenMatch} onUpdatePlayers={updateMatchPlayers} onUpdateResting={updateRestingPlayer} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} />}
         {state.currentTab === 'stats' && <PlayerStats players={state.players} sessions={state.sessions} selectedPlayerId={state.selectedPlayerId} onSelectPlayer={(id) => setState(p => p ? ({ ...p, selectedPlayerId: id }) : null)} />}
