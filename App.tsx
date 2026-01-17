@@ -9,15 +9,19 @@ import TrainingHistory from './components/TrainingHistory';
 import PlayerStats from './components/PlayerStats';
 
 const Logo = () => (
-  <img 
-    src="logo.png" 
-    alt="Roundnet Milano Logo" 
-    className="h-14 w-auto object-contain" 
-    onError={(e) => {
-      // Fallback in caso l'immagine non sia ancora presente nel path
-      (e.target as HTMLImageElement).style.opacity = '0.5';
-    }}
-  />
+  <div className="relative group">
+    <div className="absolute -inset-1 bg-red-600 rounded-full blur opacity-10 group-hover:opacity-30 transition duration-1000 group-hover:duration-200"></div>
+    <div className="relative bg-white p-1 rounded-full shadow-sm border border-slate-100">
+      <img 
+        src="logo.png" 
+        alt="Roundnet Milano" 
+        className="h-12 w-12 object-contain" 
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = 'none';
+        }}
+      />
+    </div>
+  </div>
 );
 
 const App: React.FC = () => {
@@ -70,17 +74,8 @@ const App: React.FC = () => {
 
     setState(prev => {
       if (!prev) return null;
-      
-      // 1. Reset all match stats
-      let updatedPlayers = prev.players.map(p => ({
-        ...p,
-        matchPoints: 0,
-        wins: 0,
-        losses: 0
-      }));
-
-      // 2. Sort sessions and matches chronologically
-      const allCompletedMatches: { match: Match; session: TrainingSession; round: Round }[] = [];
+      let updatedPlayers = prev.players.map(p => ({ ...p, matchPoints: 0, wins: 0, losses: 0 }));
+      const allCompletedMatches: { match: Match }[] = [];
       const sortedSessions = [...prev.sessions].sort((a, b) => a.date - b.date);
 
       sortedSessions.forEach(s => {
@@ -88,25 +83,22 @@ const App: React.FC = () => {
         sortedRounds.forEach(r => {
           r.matches.forEach(m => {
             if (m.status === 'COMPLETED') {
-              allCompletedMatches.push({ match: m, session: s, round: r });
+              allCompletedMatches.push({ match: m });
             }
           });
         });
       });
 
-      // 3. Re-apply all ratings
       allCompletedMatches.forEach(({ match }) => {
         const p1 = updatedPlayers.find(p => p.id === match.team1.playerIds[0]);
         const p2 = updatedPlayers.find(p => p.id === match.team1.playerIds[1]);
         const p3 = updatedPlayers.find(p => p.id === match.team2.playerIds[0]);
         const p4 = updatedPlayers.find(p => p.id === match.team2.playerIds[1]);
-
         if (p1 && p2 && p3 && p4) {
           const result = calculateNewRatings(p1, p2, p3, p4, match.team1.score!, match.team2.score!);
           updatedPlayers = updatedPlayers.map(p => result.players.find(u => u.id === p.id) || p);
         }
       });
-
       return { ...prev, players: updatedPlayers };
     });
   };
@@ -123,10 +115,8 @@ const App: React.FC = () => {
             const match = r.matches.find(m => m.id === matchId);
             if (!match) return r;
             const oldPid = team === 1 ? match.team1.playerIds[index] : match.team2.playerIds[index];
-            
             let resting = [...r.restingPlayerIds];
             if (resting.includes(newPid)) resting = resting.map(id => id === newPid ? oldPid : id);
-
             const matches = r.matches.map(m => {
               const t1 = [...m.team1.playerIds];
               const t2 = [...m.team2.playerIds];
@@ -142,7 +132,6 @@ const App: React.FC = () => {
               }
               return changed ? { ...m, team1: { ...m.team1, playerIds: t1 as [string, string] }, team2: { ...m.team2, playerIds: t2 as [string, string] } } : m;
             });
-
             return { ...r, matches, restingPlayerIds: resting };
           })
         } : s)
@@ -161,7 +150,6 @@ const App: React.FC = () => {
             if (r.id !== roundId) return r;
             const oldPid = r.restingPlayerIds[index];
             const resting = r.restingPlayerIds.map((id, i) => i === index ? newPid : id);
-            
             const matches = r.matches.map(m => {
               const t1 = [...m.team1.playerIds];
               const t2 = [...m.team2.playerIds];
@@ -259,21 +247,21 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-md">
         <div className="container mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <Logo />
             <div>
               <h1 className="text-2xl font-black uppercase tracking-tighter italic leading-none text-slate-900">RMI <span className="text-red-600">TRAINING</span></h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                {isSyncing ? <span className="w-2 h-2 bg-green-500 rounded-full sync-pulse"></span> : <span className="w-2 h-2 bg-slate-300 rounded-full"></span>}
-                Database Cloud
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1 mt-1">
+                {isSyncing ? <span className="w-2.5 h-2.5 bg-green-500 rounded-full sync-pulse shadow-sm shadow-green-200"></span> : <span className="w-2.5 h-2.5 bg-slate-300 rounded-full"></span>}
+                Cloud Sync attivo
               </p>
             </div>
           </div>
-          <nav className="flex bg-slate-100 p-1 rounded-xl">
+          <nav className="flex bg-slate-100 p-1.5 rounded-2xl shadow-inner border border-slate-200">
             {(['ranking', 'training', 'history', 'stats'] as const).map(tab => (
-              <button key={tab} onClick={() => setState(p => p ? ({ ...p, currentTab: tab }) : null)} className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${state.currentTab === tab ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>{tab}</button>
+              <button key={tab} onClick={() => setState(p => p ? ({ ...p, currentTab: tab }) : null)} className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${state.currentTab === tab ? 'bg-white text-red-600 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>{tab}</button>
             ))}
           </nav>
         </div>
@@ -284,7 +272,7 @@ const App: React.FC = () => {
         {state.currentTab === 'history' && <TrainingHistory sessions={state.sessions.filter(s => s.status === 'ARCHIVED')} players={state.players} onDeleteRound={deleteRound} onDeleteSession={deleteSession} onUpdateScore={updateMatchScore} onReopenMatch={reopenMatch} onUpdatePlayers={updateMatchPlayers} onUpdateResting={updateRestingPlayer} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} />}
         {state.currentTab === 'stats' && <PlayerStats players={state.players} sessions={state.sessions} selectedPlayerId={state.selectedPlayerId} onSelectPlayer={(id) => setState(p => p ? ({ ...p, selectedPlayerId: id }) : null)} />}
       </main>
-      <footer className="py-6 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest">&copy; {new Date().getFullYear()} Roundnet Milano</footer>
+      <footer className="py-8 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest border-t border-slate-100 bg-white">&copy; {new Date().getFullYear()} Roundnet Milano</footer>
     </div>
   );
 };
