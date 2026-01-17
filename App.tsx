@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Player, MatchmakingMode, AppState, TrainingSession, Gender } from './types';
+import { Player, MatchmakingMode, AppState, TrainingSession, Gender, Match } from './types';
 import { loadStateFromDB, saveStateToDB, isDBConfigured, getSupabaseConfig } from './services/storage';
 import { generateRound, calculateNewRatings } from './services/matchmaking';
 import PlayerList from './components/PlayerList';
@@ -36,7 +36,6 @@ const App: React.FC = () => {
 
     loadStateFromDB()
       .then(data => {
-        // Migrazione se necessario per nuovi campi
         const loadedState = {
           ...data,
           selectedPlayerId: data.selectedPlayerId || null,
@@ -66,6 +65,34 @@ const App: React.FC = () => {
     }, 1000);
     return () => clearTimeout(timer);
   }, [state]);
+
+  const revertPlayerPoints = (players: Player[], match: Match): Player[] => {
+    if (match.status !== 'COMPLETED') return players;
+    const delta = match.pointsDelta || 0;
+    const win1 = (match.team1.score || 0) > (match.team2.score || 0) ? 1 : 0;
+    const win2 = (match.team2.score || 0) > (match.team1.score || 0) ? 1 : 0;
+    const isDraw = match.team1.score === match.team2.score;
+
+    return players.map(p => {
+      if (match.team1.playerIds.includes(p.id)) {
+        return { 
+          ...p, 
+          matchPoints: p.matchPoints - delta, 
+          wins: isDraw ? p.wins : p.wins - win1, 
+          losses: isDraw ? p.losses : p.losses - win2 
+        };
+      }
+      if (match.team2.playerIds.includes(p.id)) {
+        return { 
+          ...p, 
+          matchPoints: p.matchPoints + delta, 
+          wins: isDraw ? p.wins : p.wins - win2, 
+          losses: isDraw ? p.losses : p.losses - win1 
+        };
+      }
+      return p;
+    });
+  };
 
   const viewPlayerStats = (playerId: string) => {
     setState(prev => prev ? ({ ...prev, currentTab: 'stats', selectedPlayerId: playerId }) : null);
@@ -102,6 +129,17 @@ const App: React.FC = () => {
     }
   };
 
+  const resetAllPoints = () => {
+    if (window.confirm("ATTENZIONE: Questa azione resetterà i punti di TUTTI i giocatori a 0. Sei sicuro?")) {
+      if (window.confirm("Ultima conferma: vuoi davvero azzerare la classifica?")) {
+        setState(prev => prev ? ({
+          ...prev,
+          players: prev.players.map(p => ({ ...p, basePoints: 0, matchPoints: 0, wins: 0, losses: 0 }))
+        }) : null);
+      }
+    }
+  };
+
   const startNewSession = (participantIds: string[], date: number) => {
     const newSession: TrainingSession = {
       id: Math.random().toString(36).substr(2, 9),
@@ -132,20 +170,47 @@ const App: React.FC = () => {
   };
 
   const deleteRound = (sessionId: string, roundId: string) => {
-    if (window.confirm("Eliminare round?")) {
-      setState(prev => prev ? ({
-        ...prev,
-        sessions: prev.sessions.map(s => s.id === sessionId ? { ...s, rounds: s.rounds.filter(r => r.id !== roundId) } : s)
-      }) : null);
+    if (window.confirm("Eliminare round e stornare i punti dei match completati?")) {
+      setState(prev => {
+        if (!prev) return null;
+        const session = prev.sessions.find(s => s.id === sessionId);
+        const round = session?.rounds.find(r => r.id === roundId);
+        if (!round) return prev;
+
+        let updatedPlayers = [...prev.players];
+        round.matches.forEach(m => {
+          updatedPlayers = revertPlayerPoints(updatedPlayers, m);
+        });
+
+        return {
+          ...prev,
+          players: updatedPlayers,
+          sessions: prev.sessions.map(s => s.id === sessionId ? { ...s, rounds: s.rounds.filter(r => r.id !== roundId) } : s)
+        };
+      });
     }
   };
 
   const deleteSession = (sessionId: string) => {
-    if (window.confirm("Eliminare sessione?")) {
-      setState(prev => prev ? ({
-        ...prev,
-        sessions: prev.sessions.filter(s => s.id !== sessionId)
-      }) : null);
+    if (window.confirm("Eliminare intera sessione e stornare TUTTI i punti accumulati?")) {
+      setState(prev => {
+        if (!prev) return null;
+        const session = prev.sessions.find(s => s.id === sessionId);
+        if (!session) return prev;
+
+        let updatedPlayers = [...prev.players];
+        session.rounds.forEach(r => {
+          r.matches.forEach(m => {
+            updatedPlayers = revertPlayerPoints(updatedPlayers, m);
+          });
+        });
+
+        return {
+          ...prev,
+          players: updatedPlayers,
+          sessions: prev.sessions.filter(s => s.id !== sessionId)
+        };
+      });
     }
   };
 
@@ -155,8 +220,10 @@ const App: React.FC = () => {
       if (!prev) return null;
       const session = prev.sessions.find(s => s.id === sessionId);
       if (!session) return prev;
+      
       let playersToUpdate: Player[] = [];
       let finalDelta = 0;
+      
       const updatedSessions = prev.sessions.map(s => {
         if (s.id !== sessionId) return s;
         return {
@@ -190,21 +257,16 @@ const App: React.FC = () => {
   };
 
   const reopenMatch = (sessionId: string, roundId: string, matchId: string) => {
-    if (!window.confirm("Riaprire partita?")) return;
+    if (!window.confirm("Riaprire partita e stornare i punti?")) return;
     setState(prev => {
       if (!prev) return null;
       const session = prev.sessions.find(s => s.id === sessionId);
       const round = session?.rounds.find(r => r.id === roundId);
       const match = round?.matches.find(m => m.id === matchId);
       if (!match || match.status !== 'COMPLETED') return prev;
-      const delta = match.pointsDelta || 0;
-      const win1 = (match.team1.score || 0) > (match.team2.score || 0) ? 1 : 0;
-      const win2 = (match.team2.score || 0) > (match.team1.score || 0) ? 1 : 0;
-      const revertedPlayers = prev.players.map(p => {
-        if (match.team1.playerIds.includes(p.id)) return { ...p, matchPoints: p.matchPoints - delta, wins: p.wins - win1, losses: p.losses - win2 };
-        if (match.team2.playerIds.includes(p.id)) return { ...p, matchPoints: p.matchPoints + delta, wins: p.wins - win2, losses: p.losses - win1 };
-        return p;
-      });
+      
+      const revertedPlayers = revertPlayerPoints(prev.players, match);
+      
       const updatedSessions = prev.sessions.map(s => {
         if (s.id !== sessionId) return s;
         return {
@@ -280,7 +342,7 @@ const App: React.FC = () => {
         </div>
       </header>
       <main className="flex-1 container mx-auto px-4 py-8">
-        {state.currentTab === 'ranking' && <PlayerList players={state.players} onAddPlayer={addPlayer} onUpdatePlayer={updatePlayer} onDeletePlayer={deletePlayer} onSelectPlayer={viewPlayerStats} />}
+        {state.currentTab === 'ranking' && <PlayerList players={state.players} onAddPlayer={addPlayer} onUpdatePlayer={updatePlayer} onDeletePlayer={deletePlayer} onSelectPlayer={viewPlayerStats} onResetPoints={resetAllPoints} />}
         {state.currentTab === 'training' && <ActiveTraining session={activeSession} players={state.players} onStartSession={startNewSession} onAddRound={addRoundToSession} onDeleteRound={deleteRound} onUpdateScore={updateMatchScore} onReopenMatch={reopenMatch} onUpdatePlayers={updateMatchPlayers} onArchive={archiveSession} onSelectPlayer={viewPlayerStats} />}
         {state.currentTab === 'history' && <TrainingHistory sessions={state.sessions.filter(s => s.status === 'ARCHIVED')} players={state.players} onDeleteRound={deleteRound} onDeleteSession={deleteSession} onUpdateScore={updateMatchScore} onReopenMatch={reopenMatch} onUpdatePlayers={updateMatchPlayers} onSelectPlayer={viewPlayerStats} />}
         {state.currentTab === 'stats' && <PlayerStats players={state.players} sessions={state.sessions} selectedPlayerId={state.selectedPlayerId} onSelectPlayer={(id) => setState(p => p ? ({ ...p, selectedPlayerId: id }) : null)} />}

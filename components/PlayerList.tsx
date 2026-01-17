@@ -8,6 +8,7 @@ interface PlayerListProps {
   onUpdatePlayer: (id: string, name: string, gender: Gender, basePoints: number, matchPoints: number) => void;
   onDeletePlayer: (id: string) => void;
   onSelectPlayer: (id: string) => void;
+  onResetPoints: () => void;
 }
 
 const InfoTooltip = ({ text, position = 'bottom' }: { text: string, position?: 'top' | 'bottom' }) => (
@@ -20,7 +21,7 @@ const InfoTooltip = ({ text, position = 'bottom' }: { text: string, position?: '
   </span>
 );
 
-const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdatePlayer, onDeletePlayer, onSelectPlayer }) => {
+const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdatePlayer, onDeletePlayer, onSelectPlayer, onResetPoints }) => {
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', gender: 'M' as Gender, basePoints: 0, matchPoints: 0 });
   const [error, setError] = useState<string | null>(null);
@@ -52,10 +53,24 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-visible relative z-10">
-      <div className="p-6 bg-slate-50 border-b border-slate-200 rounded-t-xl">
-        <h2 className="font-black text-xl text-slate-800 uppercase italic mb-4">
-          {isEditing ? 'Modifica Atleta' : 'Nuovo Atleta'}
-        </h2>
+      <div className="p-6 bg-slate-50 border-b border-slate-200 rounded-t-xl flex justify-between items-center flex-wrap gap-4">
+        <div>
+          <h2 className="font-black text-xl text-slate-800 uppercase italic">
+            {isEditing ? 'Modifica Atleta' : 'Classifica Atleti'}
+          </h2>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Totale: {players.length} Atleti</p>
+        </div>
+        {!isEditing && (
+          <button 
+            onClick={onResetPoints}
+            className="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm"
+          >
+            Reset Punti
+          </button>
+        )}
+      </div>
+
+      <div className="p-6 border-b border-slate-100">
         <form onSubmit={handleSubmit} className="flex flex-wrap gap-4 items-end">
           <div className="flex-1 min-w-[200px]">
             <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nome</label>
@@ -88,7 +103,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
             />
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="bg-red-600 text-white px-6 py-2 rounded-lg text-sm font-black uppercase hover:bg-red-700 transition-colors shadow-md">
+            <button type="submit" className="bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-black uppercase hover:bg-black transition-colors shadow-md">
               {isEditing ? 'Salva' : 'Aggiungi'}
             </button>
             {isEditing && (
@@ -96,6 +111,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
             )}
           </div>
         </form>
+        {error && <p className="text-red-500 text-[10px] font-bold uppercase mt-2">{error}</p>}
       </div>
 
       <div className="overflow-x-auto">

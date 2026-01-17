@@ -49,8 +49,19 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
       <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-200 p-8 space-y-8">
         <div className="text-center">
           <h2 className="text-3xl font-black text-slate-800 uppercase italic">Nuovo Allenamento</h2>
-          <p className="text-slate-500">Chi c'è oggi in campo?</p>
+          <p className="text-slate-500">Seleziona i presenti e imposta la data.</p>
         </div>
+
+        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Data Sessione</label>
+          <input 
+            type="date" 
+            value={sessionDate}
+            onChange={(e) => setSessionDate(e.target.value)}
+            className="w-full p-4 bg-white border border-slate-200 rounded-xl font-black text-slate-800 focus:ring-4 focus:ring-red-500/10 focus:border-red-500 outline-none transition-all"
+          />
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {players.sort((a,b) => a.name.localeCompare(b.name)).map(p => (
             <button
@@ -67,8 +78,15 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
             </button>
           ))}
         </div>
-        <div className="flex justify-center">
-          <button onClick={() => onStartSession(selectedIds, new Date(sessionDate).getTime())} disabled={selectedIds.length < 4} className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black uppercase tracking-widest disabled:opacity-30">Inizia Allenamento</button>
+        <div className="flex flex-col items-center gap-4">
+          <button 
+            onClick={() => onStartSession(selectedIds, new Date(sessionDate).getTime())} 
+            disabled={selectedIds.length < 4} 
+            className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black uppercase tracking-widest disabled:opacity-30 shadow-xl active:scale-95 transition-all"
+          >
+            Inizia Allenamento ({selectedIds.length})
+          </button>
+          {selectedIds.length < 4 && <p className="text-[10px] font-black text-red-500 uppercase">Seleziona almeno 4 giocatori</p>}
         </div>
       </div>
     );
@@ -77,9 +95,13 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       <div className="flex justify-between items-end border-b border-slate-200 pb-4">
-        <h2 className="text-2xl font-black text-slate-800 uppercase italic">Sessione Attiva</h2>
+        <div>
+          <h2 className="text-2xl font-black text-slate-800 uppercase italic">Sessione Attiva</h2>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(session.date).toLocaleDateString()}</p>
+        </div>
         <button onClick={() => onArchive(session.id)} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-bold uppercase transition-all shadow-md">Termina Sessione</button>
       </div>
+      {/* ... Rest of component remains same ... */}
       <div className="space-y-12">
         {session.rounds.map((round) => (
           <div key={round.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
