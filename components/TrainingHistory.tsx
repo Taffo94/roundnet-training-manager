@@ -72,6 +72,8 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
             <div className="p-8 border-t border-slate-100 bg-slate-50/50 space-y-10">
               {session.rounds.map(round => {
                 const conflicts = getConflicts(round);
+                const allMatchesCompleted = round.matches.every(m => m.status === 'COMPLETED');
+                
                 return (
                   <div key={round.id} className="space-y-6">
                     <div className="flex justify-between items-center">
@@ -136,12 +138,20 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                       ))}
                     </div>
                     {round.restingPlayerIds.length > 0 && (
-                      <div className={`p-4 rounded-2xl border-2 border-dashed flex flex-wrap gap-4 items-center ${conflicts.size > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200 shadow-sm'}`}>
+                      <div className={`p-4 rounded-2xl border-2 border-dashed flex flex-wrap gap-4 items-center ${conflicts.size > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200 shadow-sm'} ${allMatchesCompleted ? 'border-solid border-slate-100 bg-slate-50' : ''}`}>
                         <span className={`text-[10px] font-black uppercase tracking-widest ${conflicts.size > 0 ? 'text-red-600' : 'text-slate-400'}`}>Riposo:</span>
                         {round.restingPlayerIds.map((id, idx) => (
-                          <select key={idx} value={id} onChange={(e) => onUpdateResting(session.id, round.id, idx, e.target.value)} className={`text-[11px] font-bold p-1.5 border rounded-xl outline-none shadow-sm ${conflicts.has(id) ? 'border-red-500 text-red-600 bg-red-50' : 'bg-slate-50 border-slate-200 focus:border-red-600'}`}>
-                            {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                          </select>
+                          <React.Fragment key={idx}>
+                            {allMatchesCompleted ? (
+                              <span className="text-[12px] font-black px-3 py-1 bg-white rounded-lg border border-slate-100 text-slate-600 shadow-sm">
+                                {getPlayer(id)?.name || '???'}
+                              </span>
+                            ) : (
+                              <select key={idx} value={id} onChange={(e) => onUpdateResting(session.id, round.id, idx, e.target.value)} className={`text-[11px] font-bold p-1.5 border rounded-xl outline-none shadow-sm ${conflicts.has(id) ? 'border-red-500 text-red-600 bg-red-50' : 'bg-slate-50 border-slate-200 focus:border-red-600'}`}>
+                                {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                              </select>
+                            )}
+                          </React.Fragment>
                         ))}
                       </div>
                     )}

@@ -8,21 +8,28 @@ import ActiveTraining from './components/ActiveTraining';
 import TrainingHistory from './components/TrainingHistory';
 import PlayerStats from './components/PlayerStats';
 
-const Logo = () => (
-  <div className="relative group">
-    <div className="absolute -inset-1 bg-red-600 rounded-full blur opacity-10 group-hover:opacity-30 transition duration-1000 group-hover:duration-200"></div>
-    <div className="relative bg-white p-1 rounded-full shadow-sm border border-slate-100">
-      <img 
-        src="logo.png" 
-        alt="Roundnet Milano" 
-        className="h-12 w-12 object-contain" 
-        onError={(e) => {
-          (e.target as HTMLImageElement).style.display = 'none';
-        }}
-      />
+const Logo = () => {
+  const [error, setError] = useState(false);
+  
+  return (
+    <div className="relative">
+      <div className="bg-white p-1 rounded-full shadow-md border border-slate-100 w-14 h-14 flex items-center justify-center overflow-hidden">
+        {!error ? (
+          <img 
+            src="logo.png" 
+            alt="Roundnet Milano" 
+            className="w-full h-full object-contain" 
+            onError={() => setError(true)}
+          />
+        ) : (
+          <div className="bg-red-600 w-full h-full flex items-center justify-center text-white font-black italic text-xs">
+            RM
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState | null>(null);
@@ -70,7 +77,7 @@ const App: React.FC = () => {
 
   const recalculateRanking = () => {
     if (!state) return;
-    if (!window.confirm("Attenzione: questa operazione ricalcolerà tutti i punti basandosi cronologicamente sullo storico. Continuare?")) return;
+    if (!window.confirm("Attenzione: ricalcolare tutti i punti basandosi cronologicamente sullo storico?")) return;
 
     setState(prev => {
       if (!prev) return null;
@@ -113,7 +120,7 @@ const App: React.FC = () => {
           rounds: s.rounds.map(r => {
             if (r.id !== roundId) return r;
             const match = r.matches.find(m => m.id === matchId);
-            if (!match) return r;
+            if (!match || match.status === 'COMPLETED') return r; // Blocca se completato
             const oldPid = team === 1 ? match.team1.playerIds[index] : match.team2.playerIds[index];
             let resting = [...r.restingPlayerIds];
             if (resting.includes(newPid)) resting = resting.map(id => id === newPid ? oldPid : id);
@@ -148,6 +155,9 @@ const App: React.FC = () => {
           ...s,
           rounds: s.rounds.map(r => {
             if (r.id !== roundId) return r;
+            // Blocca se tutte le partite del round sono completate
+            if (r.matches.every(m => m.status === 'COMPLETED')) return r;
+
             const oldPid = r.restingPlayerIds[index];
             const resting = r.restingPlayerIds.map((id, i) => i === index ? newPid : id);
             const matches = r.matches.map(m => {
@@ -236,8 +246,8 @@ const App: React.FC = () => {
   };
 
   const resetAllPoints = () => {
-    if (window.confirm("Resettare TUTTI i punti e le stats di tutti i giocatori?")) {
-      if (window.confirm("ULTIMA CONFERMA: Questa azione è irreversibile. Procedere?")) {
+    if (window.confirm("Resettare TUTTI i punti e le stats?")) {
+      if (window.confirm("CONFERMA FINALE: Procedere?")) {
         setState(prev => prev ? ({ ...prev, players: prev.players.map(p => ({ ...p, basePoints: 0, matchPoints: 0, wins: 0, losses: 0 })) }) : null);
       }
     }

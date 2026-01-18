@@ -44,9 +44,9 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
   };
 
   const renderStatusBadge = (teamScore: number, opponentScore: number) => {
-    if (teamScore > opponentScore) return <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white ring-1 ring-green-100">W</span>;
-    if (teamScore < opponentScore) return <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white ring-1 ring-red-100">L</span>;
-    return <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white ring-1 ring-blue-100">T</span>;
+    if (teamScore > opponentScore) return <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white">W</span>;
+    if (teamScore < opponentScore) return <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white">L</span>;
+    return <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white">T</span>;
   };
 
   const getConflicts = (round: Round) => {
@@ -98,12 +98,17 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
       <div className="space-y-12">
         {session.rounds.map((round) => {
           const conflicts = getConflicts(round);
+          const allMatchesCompleted = round.matches.every(m => m.status === 'COMPLETED');
+
           return (
             <div key={round.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="bg-slate-800 text-white px-8 py-4 flex justify-between items-center">
                 <div className="flex items-center gap-4">
                   <span className="font-black italic uppercase tracking-widest text-sm">Round {round.roundNumber}</span>
                   <span className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-black uppercase">{round.mode.replace('_', ' ')}</span>
+                  {allMatchesCompleted && (
+                    <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-green-500/30">Completato & Bloccato</span>
+                  )}
                 </div>
                 {conflicts.size > 0 && (
                   <span className="bg-red-500 text-white text-[9px] px-3 py-1 rounded-full font-black animate-pulse flex items-center gap-2 border border-red-400 shadow-sm">
@@ -162,7 +167,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                       {m.status === 'COMPLETED' ? (
                         <div className="flex flex-col items-center">
                           <div className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-3xl italic shadow-xl tracking-tighter border-2 border-white">{m.team1.score} - {m.team2.score}</div>
-                          <button onClick={() => onReopenMatch(session.id, round.id, m.id)} className="text-[10px] font-black uppercase text-slate-400 hover:text-red-600 mt-2 tracking-widest transition-colors">Modifica Risultato</button>
+                          <button onClick={() => onReopenMatch(session.id, round.id, m.id)} className="text-[10px] font-black uppercase text-slate-400 hover:text-red-600 mt-2 tracking-widest transition-colors">Sblocca Risultato</button>
                         </div>
                       ) : (
                         <div className="flex gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
@@ -172,7 +177,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                           <button 
                             onClick={() => { 
                               if (conflicts.size > 0) {
-                                alert("Risolvi i conflitti di giocatori prima di salvare il risultato.");
+                                alert("Risolvi i conflitti di giocatori prima di salvare.");
                                 return;
                               }
                               const sc = matchScores[m.id]; 
@@ -188,17 +193,24 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                   </div>
                 ))}
                 {round.restingPlayerIds.length > 0 && (
-                  <div className={`p-5 rounded-2xl border-2 border-dashed flex flex-wrap gap-4 items-center ${conflicts.size > 0 ? 'bg-red-50 border-red-200' : 'bg-yellow-50/30 border-yellow-200'}`}>
-                    <span className={`text-[11px] font-black uppercase tracking-widest ${conflicts.size > 0 ? 'text-red-600' : 'text-yellow-700'}`}>Giocatori in Pausa:</span>
+                  <div className={`p-5 rounded-2xl border-2 border-dashed flex flex-wrap gap-4 items-center ${conflicts.size > 0 ? 'bg-red-50 border-red-200' : 'bg-yellow-50/30 border-yellow-200'} ${allMatchesCompleted ? 'border-solid border-slate-100 bg-slate-50' : ''}`}>
+                    <span className={`text-[11px] font-black uppercase tracking-widest ${conflicts.size > 0 ? 'text-red-600' : 'text-slate-400'}`}>In Pausa:</span>
                     {round.restingPlayerIds.map((id, idx) => (
-                      <select 
-                        key={idx} 
-                        value={id} 
-                        onChange={(e) => onUpdateResting(session.id, round.id, idx, e.target.value)} 
-                        className={`text-[11px] font-bold p-2 bg-white border rounded-xl outline-none shadow-sm ${conflicts.has(id) ? 'border-red-500 text-red-600 bg-red-50' : 'border-yellow-200 focus:border-yellow-500'}`}
-                      >
-                        {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      </select>
+                      <React.Fragment key={idx}>
+                        {allMatchesCompleted ? (
+                          <span className={`text-[13px] font-black px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm ${conflicts.has(id) ? 'text-red-600' : 'text-slate-700'}`}>
+                            {getPlayer(id)?.name || '???'}
+                          </span>
+                        ) : (
+                          <select 
+                            value={id} 
+                            onChange={(e) => onUpdateResting(session.id, round.id, idx, e.target.value)} 
+                            className={`text-[11px] font-bold p-2 bg-white border rounded-xl outline-none shadow-sm ${conflicts.has(id) ? 'border-red-500 text-red-600 bg-red-50' : 'border-yellow-200 focus:border-yellow-500'}`}
+                          >
+                            {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                          </select>
+                        )}
+                      </React.Fragment>
                     ))}
                   </div>
                 )}
