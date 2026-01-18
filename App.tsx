@@ -7,6 +7,10 @@ import PlayerList from './components/PlayerList';
 import ActiveTraining from './components/ActiveTraining';
 import TrainingHistory from './components/TrainingHistory';
 import PlayerStats from './components/PlayerStats';
+
+// Importazione diretta per permettere a Vite/Vercel di risolvere correttamente l'URL
+import logoImg from './logo.png';
+
 const Logo = () => {
   const [error, setError] = useState(false);
   
@@ -15,13 +19,10 @@ const Logo = () => {
       <div className="bg-white p-1 rounded-full shadow-md border border-slate-100 w-14 h-14 flex items-center justify-center overflow-hidden">
         {!error ? (
           <img 
-            src="/logo.png" 
+            src={logoImg} 
             alt="Roundnet Milano" 
             className="w-full h-full object-contain" 
-            onError={(e) => {
-            console.error("Logo non trovato o errore nel caricamento:", e);
-            setError(true);
-          }}
+            onError={() => setError(true)}
           />
         ) : (
           <div className="bg-red-600 w-full h-full flex items-center justify-center text-white font-black italic text-xs">
@@ -122,7 +123,7 @@ const App: React.FC = () => {
           rounds: s.rounds.map(r => {
             if (r.id !== roundId) return r;
             const match = r.matches.find(m => m.id === matchId);
-            if (!match || match.status === 'COMPLETED') return r; // Blocca se completato
+            if (!match || match.status === 'COMPLETED') return r;
             const oldPid = team === 1 ? match.team1.playerIds[index] : match.team2.playerIds[index];
             let resting = [...r.restingPlayerIds];
             if (resting.includes(newPid)) resting = resting.map(id => id === newPid ? oldPid : id);
@@ -157,8 +158,8 @@ const App: React.FC = () => {
           ...s,
           rounds: s.rounds.map(r => {
             if (r.id !== roundId) return r;
-            // Blocca se tutte le partite del round sono completate
-            if (r.matches.every(m => m.status === 'COMPLETED')) return r;
+            // BLOCCO DI SICUREZZA: Se c'è almeno una partita conclusa nel round, i resting sono bloccati
+            if (r.matches.some(m => m.status === 'COMPLETED')) return r;
 
             const oldPid = r.restingPlayerIds[index];
             const resting = r.restingPlayerIds.map((id, i) => i === index ? newPid : id);
