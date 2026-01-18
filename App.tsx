@@ -19,7 +19,10 @@ const Logo = () => {
             src={logo} 
             alt="Roundnet Milano" 
             className="w-full h-full object-contain" 
-            onError={() => setError(true)}
+            onError={(e) => {
+            console.error("Logo non trovato o errore nel caricamento:", e);
+            setError(true);
+          }}
           />
         ) : (
           <div className="bg-red-600 w-full h-full flex items-center justify-center text-white font-black italic text-xs">
