@@ -7,7 +7,7 @@ import PlayerList from './components/PlayerList';
 import ActiveTraining from './components/ActiveTraining';
 import TrainingHistory from './components/TrainingHistory';
 import PlayerStats from './components/PlayerStats';
-
+import logo from './logo_png';
 const Logo = () => {
   const [error, setError] = useState(false);
   
@@ -16,7 +16,7 @@ const Logo = () => {
       <div className="bg-white p-1 rounded-full shadow-md border border-slate-100 w-14 h-14 flex items-center justify-center overflow-hidden">
         {!error ? (
           <img 
-            src="logo.png" 
+            src={logo} 
             alt="Roundnet Milano" 
             className="w-full h-full object-contain" 
             onError={() => setError(true)}
