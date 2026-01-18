@@ -7,7 +7,7 @@ import PlayerList from './components/PlayerList';
 import ActiveTraining from './components/ActiveTraining';
 import TrainingHistory from './components/TrainingHistory';
 import PlayerStats from './components/PlayerStats';
-import logo from './logo.png';
+import logo from './assets/logo.png';
 const Logo = () => {
   const [error, setError] = useState(false);
   
