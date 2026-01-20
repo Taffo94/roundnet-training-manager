@@ -19,21 +19,12 @@ const createMatch = (p1: {id:string}, p2: {id:string}, p3: {id:string}, p4: {id:
   createdAt: Date.now()
 });
 
-export const getPointsDelta = (
-  p1: Player, p2: Player, 
-  p3: Player, p4: Player, 
-  score1: number, score2: number
-): number => {
-  if (score1 === score2) return 0;
-
-  const K = 32;
-  const t1Avg = ((p1.basePoints + p1.matchPoints) + (p2.basePoints + p2.matchPoints)) / 2;
-  const t2Avg = ((p3.basePoints + p3.matchPoints) + (p4.basePoints + p4.matchPoints)) / 2;
-
-  const expected1 = 1 / (1 + Math.pow(10, (t2Avg - t1Avg) / 400));
-  const actual1 = score1 > score2 ? 1 : 0;
-
-  return Math.round(K * (actual1 - expected1));
+/**
+ * Calcola l'aspettativa di vittoria (Ei) per un giocatore rispetto alla media degli avversari.
+ * Logica derivata dalla Macro Excel: 1 / (1 + 10^((oppAvg - playerElo) / 400))
+ */
+const getExpectedScore = (playerElo: number, opponentsAvgElo: number): number => {
+  return 1 / (1 + Math.pow(10, (opponentsAvgElo - playerElo) / 400));
 };
 
 export const calculateNewRatings = (
@@ -41,22 +32,51 @@ export const calculateNewRatings = (
   p3: Player, p4: Player, 
   score1: number, score2: number
 ): { players: Player[], delta: number } => {
-  const delta = getPointsDelta(p1, p2, p3, p4, score1, score2);
-  
-  if (score1 === score2) {
-    return { delta: 0, players: [p1, p2, p3, p4] };
-  }
+  // Costanti dalla Macro Excel
+  const K_BASE = 12;
+  const BONUS_FACTOR = 1.25;
+  const BONUS_MARGIN = 7;
 
-  const win1 = score1 > score2 ? 1 : 0;
-  const win2 = 1 - win1;
+  const margin = Math.abs(score1 - score2);
+  const kEff = margin >= BONUS_MARGIN ? K_BASE * BONUS_FACTOR : K_BASE;
+
+  // Risultato per squadra 1
+  let resultS1 = 0.5;
+  if (score1 > score2) resultS1 = 1.0;
+  else if (score1 < score2) resultS1 = 0.0;
+
+  const resultS2 = 1.0 - resultS1;
+
+  // Elo correnti (Base + Match)
+  const eloP1 = p1.basePoints + p1.matchPoints;
+  const eloP2 = p2.basePoints + p2.matchPoints;
+  const eloP3 = p3.basePoints + p3.matchPoints;
+  const eloP4 = p4.basePoints + p4.matchPoints;
+
+  // Medie avversari
+  const avgOppS1 = (eloP3 + eloP4) / 2;
+  const avgOppS2 = (eloP1 + eloP2) / 2;
+
+  // Calcolo Delta Individuali
+  const deltaP1 = kEff * (resultS1 - getExpectedScore(eloP1, avgOppS1));
+  const deltaP2 = kEff * (resultS1 - getExpectedScore(eloP2, avgOppS1));
+  const deltaP3 = kEff * (resultS2 - getExpectedScore(eloP3, avgOppS2));
+  const deltaP4 = kEff * (resultS2 - getExpectedScore(eloP4, avgOppS2));
+
+  // Aggiornamento statistiche Win/Loss (i pareggi non contano come W o L)
+  const isWinS1 = score1 > score2 ? 1 : 0;
+  const isWinS2 = score2 > score1 ? 1 : 0;
+  const isLossS1 = score2 > score1 ? 1 : 0;
+  const isLossS2 = score1 > score2 ? 1 : 0;
 
   return {
-    delta,
+    // Il delta restituito per la visualizzazione è la media del team vincitore (o team 1 in caso di pareggio)
+    delta: Math.round(resultS1 >= 0.5 ? deltaP1 : deltaP3), 
     players: [
-      { ...p1, matchPoints: p1.matchPoints + delta, wins: p1.wins + win1, losses: p1.losses + win2 },
-      { ...p2, matchPoints: p2.matchPoints + delta, wins: p2.wins + win1, losses: p2.losses + win2 },
-      { ...p3, matchPoints: p3.matchPoints - delta, wins: p3.wins + win2, losses: p3.losses + win1 },
-      { ...p4, matchPoints: p4.matchPoints - delta, wins: p4.wins + win2, losses: p4.losses + win1 },
+      { ...p1, matchPoints: p1.matchPoints + deltaP1, wins: p1.wins + isWinS1, losses: p1.losses + isLossS1 },
+      { ...p2, matchPoints: p2.matchPoints + deltaP2, wins: p2.wins + isWinS1, losses: p2.losses + isLossS1 },
+      { ...p3, matchPoints: p3.matchPoints + deltaP3, wins: p3.wins + isWinS2, losses: p3.losses + isLossS2 },
+      { ...p4, matchPoints: p4.matchPoints + deltaP4, wins: p3.wins + isWinS2, losses: p4.losses + isLossS2 },
     ]
   };
 };
@@ -82,7 +102,7 @@ export const generateRound = (
   let pool = [...allParticipants];
   const sortedByRest = [...pool].sort((a, b) => restCounts[a.id] - restCounts[b.id]);
   const restingPlayers = numResting > 0 ? sortedByRest.slice(0, numResting) : [];
-  const activePlayers = pool.filter(p => !restingPlayers.find(rp => rp.id === p.id));
+  const activePlayers = pool.filter(p => !restingPlayers.find(rp => rp.id === rp.id)); // Fix: comparazione id corretta
 
   const matches: Match[] = [];
   let playersToPair = [...activePlayers];

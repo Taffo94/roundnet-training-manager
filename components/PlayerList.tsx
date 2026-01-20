@@ -136,11 +136,11 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
               </th>
               <th className="px-6 py-3 text-center">
                 Match
-                <InfoTooltip text="Punti accumulati o persi durante le partite di allenamento (Sistema Elo)." />
+                <InfoTooltip text="Punti accumulati o persi tramite logica Elo (K=12, Bonus Margin ≥ 7)." />
               </th>
               <th className="px-6 py-3 text-center text-red-600 font-black italic">
                 Totale
-                <InfoTooltip text="La somma di Punti Base e Punti Match che determina la posizione in classifica." />
+                <InfoTooltip text="Somma di Punti Base e Match che determina la posizione in classifica." />
               </th>
               <th className="px-6 py-3 text-center">V / S</th>
               <th className="px-6 py-3"></th>
@@ -165,10 +165,10 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
                   {player.basePoints}
                 </td>
                 <td className="px-6 py-4 text-center font-medium text-slate-500">
-                  {player.matchPoints > 0 ? `+${player.matchPoints}` : player.matchPoints}
+                  {Math.round(player.matchPoints) > 0 ? `+${Math.round(player.matchPoints)}` : Math.round(player.matchPoints)}
                 </td>
                 <td className="px-6 py-4 text-center">
-                  <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full text-sm font-black italic">{player.basePoints + player.matchPoints}</span>
+                  <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full text-sm font-black italic">{Math.round(player.basePoints + player.matchPoints)}</span>
                 </td>
                 <td className="px-6 py-4 text-center text-xs font-bold text-slate-400">
                   <span className="text-green-600">{player.wins}</span> / <span className="text-red-400">{player.losses}</span>
