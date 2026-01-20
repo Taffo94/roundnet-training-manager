@@ -75,7 +75,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
           {players.sort((a,b) => a.name.localeCompare(b.name)).map(p => (
             <button key={p.id} onClick={() => togglePlayer(p.id)} className={`p-4 rounded-2xl border-2 text-sm font-bold transition-all text-left flex flex-col ${selectedIds.includes(p.id) ? 'bg-red-600 border-red-600 text-white shadow-lg transform scale-105' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-red-300'}`}>
               <span className="truncate">{p.name}</span>
-              <span className={`text-[9px] font-black mt-1 uppercase tracking-widest ${selectedIds.includes(p.id) ? 'text-white/60' : 'text-slate-400'}`}>{p.gender} • {p.basePoints + p.matchPoints} PT</span>
+              <span className={`text-[9px] font-black mt-1 uppercase tracking-widest ${selectedIds.includes(p.id) ? 'text-white/60' : 'text-slate-400'}`}>{p.gender} • {Math.round(p.basePoints + p.matchPoints)} PT</span>
             </button>
           ))}
         </div>
@@ -98,7 +98,6 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
       <div className="space-y-12">
         {session.rounds.map((round) => {
           const conflicts = getConflicts(round);
-          // IL ROUND È BLOCCATO se almeno una partita è stata giocata
           const isRoundLocked = round.matches.some(m => m.status === 'COMPLETED');
 
           return (
@@ -138,27 +137,38 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                               </span>
                             </div>
                             <div className="space-y-2">
-                              {teamIds.map((id, idx) => (
-                                <div key={idx}>
-                                  {m.status === 'PENDING' ? (
-                                    <select 
-                                      value={id} 
-                                      onChange={(e) => onUpdatePlayers(session.id, round.id, m.id, t as 1|2, idx as 0|1, e.target.value)} 
-                                      className={`text-[12px] font-bold p-2 bg-white border rounded-xl outline-none w-full shadow-sm ${conflicts.has(id) ? 'border-red-500 text-red-600 bg-red-50' : 'border-slate-200 focus:border-red-600'}`}
-                                    >
-                                      <option value="">Scegli...</option>
-                                      {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                    </select>
-                                  ) : (
-                                    <button 
-                                      onClick={() => onSelectPlayer(id)} 
-                                      className={`text-[15px] font-black hover:text-red-600 truncate block w-full text-inherit ${t === 2 ? 'text-right' : 'text-left'} ${conflicts.has(id) ? 'text-red-600 underline decoration-red-500 decoration-2 underline-offset-4' : 'text-slate-800'}`}
-                                    >
-                                      {getPlayer(id)?.name || '???'}
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
+                              {teamIds.map((id, idx) => {
+                                const player = getPlayer(id);
+                                const delta = m.individualDeltas?.[id];
+                                return (
+                                  <div key={idx}>
+                                    {m.status === 'PENDING' ? (
+                                      <select 
+                                        value={id} 
+                                        onChange={(e) => onUpdatePlayers(session.id, round.id, m.id, t as 1|2, idx as 0|1, e.target.value)} 
+                                        className={`text-[12px] font-bold p-2 bg-white border rounded-xl outline-none w-full shadow-sm ${conflicts.has(id) ? 'border-red-500 text-red-600 bg-red-50' : 'border-slate-200 focus:border-red-600'}`}
+                                      >
+                                        <option value="">Scegli...</option>
+                                        {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                      </select>
+                                    ) : (
+                                      <div className={`flex items-center gap-2 w-full ${t === 2 ? 'justify-end' : ''}`}>
+                                        <button 
+                                          onClick={() => onSelectPlayer(id)} 
+                                          className={`text-[15px] font-black hover:text-red-600 truncate ${t === 2 ? 'text-right order-2' : 'text-left'} ${conflicts.has(id) ? 'text-red-600 underline decoration-red-500 decoration-2 underline-offset-4' : 'text-slate-800'}`}
+                                        >
+                                          {player?.name || '???'}
+                                        </button>
+                                        {delta !== undefined && (
+                                          <span className={`text-[9px] font-black italic px-1.5 py-0.5 rounded ${delta >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                                            {delta >= 0 ? '+' : ''}{delta.toFixed(1)}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         );

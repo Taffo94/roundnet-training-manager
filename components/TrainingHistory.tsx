@@ -116,7 +116,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                                               </button>
                                               {delta !== undefined && (
                                                 <span className={`text-[9px] font-black italic px-1.5 py-0.5 rounded ${delta >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-                                                  {delta >= 0 ? '+' : ''}{Math.round(delta * 10) / 10}
+                                                  {delta >= 0 ? '+' : ''}{delta.toFixed(1)}
                                                 </span>
                                               )}
                                             </div>
