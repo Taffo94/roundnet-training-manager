@@ -21,10 +21,11 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
   const getPlayer = (id: string) => players.find(p => p.id === id);
 
   const getTeamPoints = (ids: string[]) => {
-    return ids.reduce((acc, id) => {
+    const total = ids.reduce((acc, id) => {
       const p = getPlayer(id);
       return acc + (p ? (p.basePoints + p.matchPoints) : 0);
     }, 0);
+    return Math.round(total);
   };
 
   const renderStatusBadge = (teamScore: number, opponentScore: number) => {

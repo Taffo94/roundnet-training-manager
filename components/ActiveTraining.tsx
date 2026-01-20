@@ -37,10 +37,11 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
   const participants = session ? players.filter(p => session.participantIds.includes(p.id)).sort((a,b) => a.name.localeCompare(b.name)) : [];
 
   const getTeamPoints = (ids: string[]) => {
-    return ids.reduce((acc, id) => {
+    const total = ids.reduce((acc, id) => {
       const p = getPlayer(id);
       return acc + (p ? (p.basePoints + p.matchPoints) : 0);
     }, 0);
+    return Math.round(total);
   };
 
   const renderStatusBadge = (teamScore: number, opponentScore: number) => {
