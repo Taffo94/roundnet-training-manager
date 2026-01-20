@@ -72,7 +72,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
             <div className="p-8 border-t border-slate-100 bg-slate-50/50 space-y-10">
               {session.rounds.map(round => {
                 const conflicts = getConflicts(round);
-                const allMatchesCompleted = round.matches.every(m => m.status === 'COMPLETED');
+                const isRoundLocked = round.matches.some(m => m.status === 'COMPLETED');
                 
                 return (
                   <div key={round.id} className="space-y-6">
@@ -98,19 +98,32 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                                     </span>
                                     <span className="text-[9px] font-black text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-100 shadow-sm">{getTeamPoints(teamIds)} PT</span>
                                   </div>
-                                  <div className="space-y-1.5">
-                                    {teamIds.map((id, idx) => (
-                                      <div key={idx}>
-                                        {m.status === 'PENDING' ? (
-                                          <select value={id} onChange={(e) => onUpdatePlayers(session.id, round.id, m.id, t as 1|2, idx as 0|1, e.target.value)} className={`text-[11px] font-bold p-1.5 w-full border rounded-xl outline-none shadow-sm ${conflicts.has(id) ? 'border-red-500 bg-red-50 text-red-600' : 'bg-white border-slate-200 focus:border-red-600'}`}>
-                                            <option value="">Scegli...</option>
-                                            {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                          </select>
-                                        ) : (
-                                          <button onClick={() => onSelectPlayer(id)} className={`text-[13px] font-black hover:text-red-600 block w-full truncate tracking-tight transition-colors ${t === 2 ? 'text-right' : 'text-left'} ${conflicts.has(id) ? 'text-red-600 underline decoration-2 decoration-red-400 underline-offset-2' : 'text-slate-800'}`}>{getPlayer(id)?.name || '???'}</button>
-                                        )}
-                                      </div>
-                                    ))}
+                                  <div className="space-y-2">
+                                    {teamIds.map((id, idx) => {
+                                      const player = getPlayer(id);
+                                      const delta = m.individualDeltas?.[id];
+                                      return (
+                                        <div key={idx} className="flex items-center gap-2">
+                                          {m.status === 'PENDING' ? (
+                                            <select value={id} onChange={(e) => onUpdatePlayers(session.id, round.id, m.id, t as 1|2, idx as 0|1, e.target.value)} className={`text-[11px] font-bold p-1.5 w-full border rounded-xl outline-none shadow-sm ${conflicts.has(id) ? 'border-red-500 bg-red-50 text-red-600' : 'bg-white border-slate-200 focus:border-red-600'}`}>
+                                              <option value="">Scegli...</option>
+                                              {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                            </select>
+                                          ) : (
+                                            <div className={`flex items-center gap-2 w-full ${t === 2 ? 'justify-end' : ''}`}>
+                                              <button onClick={() => onSelectPlayer(id)} className={`text-[13px] font-black hover:text-red-600 truncate tracking-tight transition-colors ${t === 2 ? 'text-right order-2' : 'text-left'} ${conflicts.has(id) ? 'text-red-600 underline decoration-2 decoration-red-400 underline-offset-2' : 'text-slate-800'}`}>
+                                                {player?.name || '???'}
+                                              </button>
+                                              {delta !== undefined && (
+                                                <span className={`text-[9px] font-black italic px-1.5 py-0.5 rounded ${delta >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                                                  {delta >= 0 ? '+' : ''}{Math.round(delta * 10) / 10}
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                                );
@@ -138,11 +151,11 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                       ))}
                     </div>
                     {round.restingPlayerIds.length > 0 && (
-                      <div className={`p-4 rounded-2xl border-2 border-dashed flex flex-wrap gap-4 items-center ${conflicts.size > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200 shadow-sm'} ${allMatchesCompleted ? 'border-solid border-slate-100 bg-slate-50' : ''}`}>
+                      <div className={`p-4 rounded-2xl border-2 border-dashed flex flex-wrap gap-4 items-center ${conflicts.size > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200 shadow-sm'} ${isRoundLocked ? 'border-solid border-slate-100 bg-slate-50' : ''}`}>
                         <span className={`text-[10px] font-black uppercase tracking-widest ${conflicts.size > 0 ? 'text-red-600' : 'text-slate-400'}`}>Riposo:</span>
                         {round.restingPlayerIds.map((id, idx) => (
                           <React.Fragment key={idx}>
-                            {allMatchesCompleted ? (
+                            {isRoundLocked ? (
                               <span className="text-[12px] font-black px-3 py-1 bg-white rounded-lg border border-slate-100 text-slate-600 shadow-sm">
                                 {getPlayer(id)?.name || '???'}
                               </span>

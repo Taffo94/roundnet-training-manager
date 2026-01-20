@@ -61,18 +61,24 @@ const App: React.FC = () => {
   }, [state]);
 
   const revertPlayerPoints = (players: Player[], match: Match): Player[] => {
-    if (match.status !== 'COMPLETED') return players;
-    const delta = match.pointsDelta || 0;
+    if (match.status !== 'COMPLETED' || !match.individualDeltas) return players;
+    
     const win1 = (match.team1.score || 0) > (match.team2.score || 0) ? 1 : 0;
     const win2 = (match.team2.score || 0) > (match.team1.score || 0) ? 1 : 0;
     const isDraw = match.team1.score === match.team2.score;
 
     return players.map(p => {
-      if (match.team1.playerIds.includes(p.id)) {
-        return { ...p, matchPoints: p.matchPoints - delta, wins: isDraw ? p.wins : p.wins - win1, losses: isDraw ? p.losses : p.losses - win2 };
-      }
-      if (match.team2.playerIds.includes(p.id)) {
-        return { ...p, matchPoints: p.matchPoints + delta, wins: isDraw ? p.wins : p.wins - win2, losses: isDraw ? p.losses : p.losses - win1 };
+      const d = match.individualDeltas![p.id];
+      if (d !== undefined) {
+        const isTeam1 = match.team1.playerIds.includes(p.id);
+        const win = isTeam1 ? win1 : win2;
+        const loss = isTeam1 ? win2 : win1;
+        return { 
+          ...p, 
+          matchPoints: p.matchPoints - d, 
+          wins: isDraw ? p.wins : p.wins - win, 
+          losses: isDraw ? p.losses : p.losses - loss 
+        };
       }
       return p;
     });
@@ -107,6 +113,9 @@ const App: React.FC = () => {
         if (p1 && p2 && p3 && p4) {
           const result = calculateNewRatings(p1, p2, p3, p4, match.team1.score!, match.team2.score!);
           updatedPlayers = updatedPlayers.map(p => result.players.find(u => u.id === p.id) || p);
+          // Aggiorniamo anche l'oggetto match per consistenza storica se mancassero i delta
+          match.individualDeltas = result.individualDeltas;
+          match.pointsDelta = result.delta;
         }
       });
       return { ...prev, players: updatedPlayers };
@@ -158,7 +167,6 @@ const App: React.FC = () => {
           ...s,
           rounds: s.rounds.map(r => {
             if (r.id !== roundId) return r;
-            // BLOCCO DI SICUREZZA: Se c'è almeno una partita conclusa nel round, i resting sono bloccati
             if (r.matches.some(m => m.status === 'COMPLETED')) return r;
 
             const oldPid = r.restingPlayerIds[index];
@@ -215,7 +223,7 @@ const App: React.FC = () => {
       const players = revertPlayerPoints(prev.players, match);
       const sessions = prev.sessions.map(s => s.id === sessionId ? {
         ...s, rounds: s.rounds.map(r => r.id === roundId ? {
-          ...r, matches: r.matches.map(m => m.id === matchId ? { ...m, status: 'PENDING' as const, team1: { ...m.team1, score: undefined }, team2: { ...m.team2, score: undefined }, pointsDelta: undefined } : m)
+          ...r, matches: r.matches.map(m => m.id === matchId ? { ...m, status: 'PENDING' as const, team1: { ...m.team1, score: undefined }, team2: { ...m.team2, score: undefined }, pointsDelta: undefined, individualDeltas: undefined } : m)
         } : r)
       } : s);
       return { ...prev, players, sessions };
@@ -227,6 +235,8 @@ const App: React.FC = () => {
       if (!prev) return null;
       let playersToUpdate: Player[] = [];
       let finalDelta = 0;
+      let indDeltas: Record<string, number> = {};
+      
       const sessions = prev.sessions.map(s => s.id === sessionId ? {
         ...s, rounds: s.rounds.map(r => r.id === roundId ? {
           ...r, matches: r.matches.map(m => {
@@ -239,7 +249,8 @@ const App: React.FC = () => {
             const result = calculateNewRatings(p1, p2, p3, p4, s1, s2);
             playersToUpdate = result.players;
             finalDelta = result.delta;
-            return { ...m, status: 'COMPLETED' as const, team1: { ...m.team1, score: s1 }, team2: { ...m.team2, score: s2 }, pointsDelta: finalDelta };
+            indDeltas = result.individualDeltas;
+            return { ...m, status: 'COMPLETED' as const, team1: { ...m.team1, score: s1 }, team2: { ...m.team2, score: s2 }, pointsDelta: finalDelta, individualDeltas: indDeltas };
           })
         } : r)
       } : s);

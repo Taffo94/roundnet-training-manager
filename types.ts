@@ -32,7 +32,8 @@ export interface Match {
   status: 'PENDING' | 'COMPLETED';
   mode: MatchmakingMode;
   createdAt: number;
-  pointsDelta?: number;
+  pointsDelta?: number; // Delta medio del team vincitore
+  individualDeltas?: Record<string, number>; // Delta specifico per ogni ID giocatore
 }
 
 export interface Round {

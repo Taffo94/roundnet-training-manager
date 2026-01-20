@@ -31,7 +31,7 @@ export const calculateNewRatings = (
   p1: Player, p2: Player, 
   p3: Player, p4: Player, 
   score1: number, score2: number
-): { players: Player[], delta: number } => {
+): { players: Player[], delta: number, individualDeltas: Record<string, number> } => {
   // Costanti dalla Macro Excel
   const K_BASE = 12;
   const BONUS_FACTOR = 1.25;
@@ -69,14 +69,21 @@ export const calculateNewRatings = (
   const isLossS1 = score2 > score1 ? 1 : 0;
   const isLossS2 = score1 > score2 ? 1 : 0;
 
+  const individualDeltas: Record<string, number> = {
+    [p1.id]: deltaP1,
+    [p2.id]: deltaP2,
+    [p3.id]: deltaP3,
+    [p4.id]: deltaP4
+  };
+
   return {
-    // Il delta restituito per la visualizzazione è la media del team vincitore (o team 1 in caso di pareggio)
     delta: Math.round(resultS1 >= 0.5 ? deltaP1 : deltaP3), 
+    individualDeltas,
     players: [
       { ...p1, matchPoints: p1.matchPoints + deltaP1, wins: p1.wins + isWinS1, losses: p1.losses + isLossS1 },
       { ...p2, matchPoints: p2.matchPoints + deltaP2, wins: p2.wins + isWinS1, losses: p2.losses + isLossS1 },
       { ...p3, matchPoints: p3.matchPoints + deltaP3, wins: p3.wins + isWinS2, losses: p3.losses + isLossS2 },
-      { ...p4, matchPoints: p4.matchPoints + deltaP4, wins: p3.wins + isWinS2, losses: p4.losses + isLossS2 },
+      { ...p4, matchPoints: p4.matchPoints + deltaP4, wins: p4.wins + isWinS2, losses: p4.losses + isLossS2 },
     ]
   };
 };
@@ -102,7 +109,8 @@ export const generateRound = (
   let pool = [...allParticipants];
   const sortedByRest = [...pool].sort((a, b) => restCounts[a.id] - restCounts[b.id]);
   const restingPlayers = numResting > 0 ? sortedByRest.slice(0, numResting) : [];
-  const activePlayers = pool.filter(p => !restingPlayers.find(rp => rp.id === rp.id)); // Fix: comparazione id corretta
+  const restingIds = restingPlayers.map(p => p.id);
+  const activePlayers = pool.filter(p => !restingIds.includes(p.id));
 
   const matches: Match[] = [];
   let playersToPair = [...activePlayers];
@@ -152,7 +160,7 @@ export const generateRound = (
     id: Math.random().toString(36).substr(2, 9),
     roundNumber,
     matches,
-    restingPlayerIds: restingPlayers.map(p => p.id),
+    restingPlayerIds: restingIds,
     mode
   };
 };
