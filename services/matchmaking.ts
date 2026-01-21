@@ -109,6 +109,24 @@ export const generateRound = (
     for (let i = 0; i < numMatches; i++) {
       matches.push(createMatch({id: ''}, {id: ''}, {id: ''}, {id: ''}, mode));
     }
+  } else if (mode === MatchmakingMode.SAME_LEVEL) {
+    // Ordiniamo per livello e creiamo blocchi di 4 giocatori vicini tra loro
+    playersToPair.sort((a, b) => getTot(b) - getTot(a));
+    for (let i = 0; i < numMatches; i++) {
+      const block = playersToPair.splice(0, 4);
+      const shuffledBlock = shuffle(block); // In SAME_LEVEL mischiamo i 4 di pari livello
+      matches.push(createMatch(shuffledBlock[0], shuffledBlock[1], shuffledBlock[2], shuffledBlock[3], mode));
+    }
+  } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
+    // LOGICA BALANCED PAIRS: Migliore + Peggiore vs i due Centrali
+    // Esempio: P1(100), P2(80), P3(75), P4(50)
+    // Risultato: Team 1 (P1+P4) = 150 vs Team 2 (P2+P3) = 155
+    // Questo bilancia la somma totale massimizzando la diversità interna
+    playersToPair.sort((a, b) => getTot(b) - getTot(a));
+    for (let i = 0; i < numMatches; i++) {
+      const block = playersToPair.splice(0, 4);
+      matches.push(createMatch(block[0], block[3], block[1], block[2], mode));
+    }
   } else if (mode === MatchmakingMode.GENDER_BALANCED) {
     const males = shuffle(playersToPair.filter(p => p.gender === 'M'));
     const females = shuffle(playersToPair.filter(p => p.gender === 'F'));
@@ -128,24 +146,6 @@ export const generateRound = (
     for (let i = 0; i < numMatches; i++) {
       const p = playersToPair.splice(0, 4);
       matches.push(createMatch(p[0], p[1], p[2], p[3], mode));
-    }
-  } else if (mode === MatchmakingMode.SAME_LEVEL) {
-    playersToPair.sort((a, b) => getTot(b) - getTot(a));
-    for (let i = 0; i < numMatches; i++) {
-      const block = playersToPair.splice(0, 4);
-      const shuffledBlock = shuffle(block);
-      matches.push(createMatch(shuffledBlock[0], shuffledBlock[1], shuffledBlock[2], shuffledBlock[3], mode));
-    }
-  } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
-    // Criterio: Bilancia somma ma massimizza gap interno nel primo team
-    // Sort per livello: P1(Top), P2, P3, P4(Bottom)
-    playersToPair.sort((a, b) => getTot(b) - getTot(a));
-    for (let i = 0; i < numMatches; i++) {
-      const block = playersToPair.splice(0, 4);
-      // P1 + P4 vs P2 + P3
-      // Team 1: Il più forte con il meno forte (massimo gap interno)
-      // Team 2: I due centrali (minimo gap interno)
-      matches.push(createMatch(block[0], block[3], block[1], block[2], mode));
     }
   }
 

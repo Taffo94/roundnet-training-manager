@@ -86,7 +86,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
             type="date" 
             value={sessionDate} 
             onChange={(e) => setSessionDate(e.target.value)} 
-            className="w-full p-4 bg-white border border-slate-200 rounded-xl font-black text-slate-800 outline-none focus:ring-4 focus:ring-red-600/10 focus:border-red-600 transition-all" 
+            className="w-full p-4 bg-white border border-slate-200 rounded-xl font-black text-slate-800 outline-none focus:ring-4 focus:ring-red-600/10 focus:border-red-500 transition-all" 
           />
         </div>
 
@@ -114,12 +114,12 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
   return (
     <div className="space-y-10 max-w-5xl mx-auto">
       <div className="flex justify-between items-end border-b-2 border-slate-100 pb-6">
-        <div className="relative group/head">
+        <div>
           <h2 className="text-3xl font-black text-slate-800 uppercase italic tracking-tighter leading-tight">Sessione Attiva</h2>
           <div className="flex items-center gap-3">
             <p className="text-[11px] font-black text-red-600 uppercase tracking-[0.2em]">{new Date(session.date).toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long' })}</p>
             <div className="relative">
-              <button className="text-[9px] font-black uppercase text-slate-300 hover:text-red-500 flex items-center gap-1 transition-colors">
+              <button className="text-[10px] font-black uppercase text-slate-300 hover:text-red-500 flex items-center gap-1 transition-colors">
                  ✏️ Modifica Data
               </button>
               <input 

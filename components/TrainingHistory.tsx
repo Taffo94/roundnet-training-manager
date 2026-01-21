@@ -72,20 +72,21 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
               </div>
             </summary>
             <div className="p-8 border-t border-slate-100 bg-slate-50/50 space-y-10">
-              <div className="flex justify-start items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Riepilogo Sessione:</span>
-                 <div className="relative">
-                    <button className="text-[10px] font-black text-red-600 hover:underline flex items-center gap-1">
-                       ✏️ Modifica Data
-                    </button>
-                    <input 
-                      type="date" 
-                      className="absolute inset-0 opacity-0 cursor-pointer" 
-                      onChange={(e) => {
-                        if(e.target.value) onUpdateSessionDate(session.id, new Date(e.target.value).getTime());
-                      }}
-                    />
-                 </div>
+              {/* MODIFICA DATA INTERNA PER EVITARE BUG ACCORDION */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div className="text-[11px] font-black uppercase text-slate-400 tracking-widest">Dati Sessione:</div>
+                <div className="relative">
+                  <button className="text-[10px] font-black text-red-600 hover:text-red-700 underline flex items-center gap-1 transition-colors">
+                    ✏️ Modifica Data Allenamento
+                  </button>
+                  <input 
+                    type="date" 
+                    className="absolute inset-0 opacity-0 cursor-pointer" 
+                    onChange={(e) => {
+                      if(e.target.value) onUpdateSessionDate(session.id, new Date(e.target.value).getTime());
+                    }}
+                  />
+                </div>
               </div>
 
               {session.rounds.map(round => {

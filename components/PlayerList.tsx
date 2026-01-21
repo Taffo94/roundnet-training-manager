@@ -15,7 +15,7 @@ interface PlayerListProps {
 const InfoTooltip = ({ text, position = 'bottom' }: { text: string, position?: 'top' | 'bottom' }) => (
   <span className="ml-1 cursor-help group relative inline-block">
     <span className="text-slate-400 font-bold bg-slate-100 rounded-full w-4 h-4 inline-flex items-center justify-center text-[10px]">?</span>
-    <span className={`pointer-events-none absolute ${position === 'bottom' ? 'bottom-full mb-2' : 'top-full mt-2'} left-1/2 -translate-x-1/2 w-48 p-2 bg-slate-900 text-white text-[10px] font-normal normal-case rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-[999] shadow-2xl`}>
+    <span className={`pointer-events-none absolute ${position === 'bottom' ? 'bottom-full mb-2' : 'top-full mt-2'} left-1/2 -translate-x-1/2 w-48 p-2 bg-slate-900 text-white text-[10px] font-normal normal-case rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-[9999] shadow-2xl`}>
       {text}
       <span className={`absolute ${position === 'bottom' ? 'top-full border-t-slate-900' : 'bottom-full border-b-slate-900'} left-1/2 -translate-x-1/2 border-8 border-transparent`}></span>
     </span>
@@ -146,7 +146,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
               <th className="px-6 py-3"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 overflow-visible">
             {sortedPlayers.map((player, index) => (
               <tr key={player.id} className="hover:bg-slate-50 transition-colors group">
                 <td className="px-6 py-4 font-black text-slate-300 italic">#{index + 1}</td>
