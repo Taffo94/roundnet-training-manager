@@ -19,10 +19,6 @@ const createMatch = (p1: {id:string}, p2: {id:string}, p3: {id:string}, p4: {id:
   createdAt: Date.now()
 });
 
-/**
- * Calcola l'aspettativa di vittoria (Ei) per un giocatore rispetto alla media degli avversari.
- * Logica derivata dalla Macro Excel: 1 / (1 + 10^((oppAvg - playerElo) / 400))
- */
 const getExpectedScore = (playerElo: number, opponentsAvgElo: number): number => {
   return 1 / (1 + Math.pow(10, (opponentsAvgElo - playerElo) / 400));
 };
@@ -32,7 +28,6 @@ export const calculateNewRatings = (
   p3: Player, p4: Player, 
   score1: number, score2: number
 ): { players: Player[], delta: number, individualDeltas: Record<string, number> } => {
-  // Costanti dalla Macro Excel
   const K_BASE = 12;
   const BONUS_FACTOR = 1.25;
   const BONUS_MARGIN = 7;
@@ -40,30 +35,24 @@ export const calculateNewRatings = (
   const margin = Math.abs(score1 - score2);
   const kEff = margin >= BONUS_MARGIN ? K_BASE * BONUS_FACTOR : K_BASE;
 
-  // Risultato per squadra 1
   let resultS1 = 0.5;
   if (score1 > score2) resultS1 = 1.0;
   else if (score1 < score2) resultS1 = 0.0;
-
   const resultS2 = 1.0 - resultS1;
 
-  // Elo correnti (Base + Match)
   const eloP1 = p1.basePoints + p1.matchPoints;
   const eloP2 = p2.basePoints + p2.matchPoints;
   const eloP3 = p3.basePoints + p3.matchPoints;
   const eloP4 = p4.basePoints + p4.matchPoints;
 
-  // Medie avversari
   const avgOppS1 = (eloP3 + eloP4) / 2;
   const avgOppS2 = (eloP1 + eloP2) / 2;
 
-  // Calcolo Delta Individuali
   const deltaP1 = kEff * (resultS1 - getExpectedScore(eloP1, avgOppS1));
   const deltaP2 = kEff * (resultS1 - getExpectedScore(eloP2, avgOppS1));
   const deltaP3 = kEff * (resultS2 - getExpectedScore(eloP3, avgOppS2));
   const deltaP4 = kEff * (resultS2 - getExpectedScore(eloP4, avgOppS2));
 
-  // Aggiornamento statistiche Win/Loss (i pareggi non contano come W o L)
   const isWinS1 = score1 > score2 ? 1 : 0;
   const isWinS2 = score2 > score1 ? 1 : 0;
   const isLossS1 = score2 > score1 ? 1 : 0;
@@ -114,7 +103,6 @@ export const generateRound = (
 
   const matches: Match[] = [];
   let playersToPair = [...activePlayers];
-
   const getTot = (p: Player) => p.basePoints + p.matchPoints;
 
   if (mode === MatchmakingMode.CUSTOM) {
@@ -149,9 +137,14 @@ export const generateRound = (
       matches.push(createMatch(shuffledBlock[0], shuffledBlock[1], shuffledBlock[2], shuffledBlock[3], mode));
     }
   } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
+    // Criterio: Bilancia somma ma massimizza gap interno nel primo team
+    // Sort per livello: P1(Top), P2, P3, P4(Bottom)
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
     for (let i = 0; i < numMatches; i++) {
       const block = playersToPair.splice(0, 4);
+      // P1 + P4 vs P2 + P3
+      // Team 1: Il più forte con il meno forte (massimo gap interno)
+      // Team 2: I due centrali (minimo gap interno)
       matches.push(createMatch(block[0], block[3], block[1], block[2], mode));
     }
   }

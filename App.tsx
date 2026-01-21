@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Player, MatchmakingMode, AppState, TrainingSession, Gender, Match, Round } from './types';
 import { loadStateFromDB, saveStateToDB, isDBConfigured, getSupabaseConfig } from './services/storage';
 import { generateRound, calculateNewRatings } from './services/matchmaking';
@@ -8,12 +8,10 @@ import ActiveTraining from './components/ActiveTraining';
 import TrainingHistory from './components/TrainingHistory';
 import PlayerStats from './components/PlayerStats';
 
-// Importazione diretta per permettere a Vite/Vercel di risolvere correttamente l'URL
 import logoImg from './logo.png';
 
 const Logo = () => {
   const [error, setError] = useState(false);
-  
   return (
     <div className="relative">
       <div className="bg-white p-1 rounded-full shadow-md border border-slate-100 w-14 h-14 flex items-center justify-center overflow-hidden">
@@ -60,9 +58,29 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, [state]);
 
+  const attendanceMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (!state) return map;
+    state.sessions.forEach(s => {
+      s.participantIds.forEach(id => {
+        map[id] = (map[id] || 0) + 1;
+      });
+    });
+    return map;
+  }, [state?.sessions]);
+
+  const updateSessionDate = (sessionId: string, newDate: number) => {
+    setState(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        sessions: prev.sessions.map(s => s.id === sessionId ? { ...s, date: newDate } : s)
+      };
+    });
+  };
+
   const revertPlayerPoints = (players: Player[], match: Match): Player[] => {
     if (match.status !== 'COMPLETED' || !match.individualDeltas) return players;
-    
     const win1 = (match.team1.score || 0) > (match.team2.score || 0) ? 1 : 0;
     const win2 = (match.team2.score || 0) > (match.team1.score || 0) ? 1 : 0;
     const isDraw = match.team1.score === match.team2.score;
@@ -91,7 +109,6 @@ const App: React.FC = () => {
     setState(prev => {
       if (!prev) return null;
       let updatedPlayers = prev.players.map(p => ({ ...p, matchPoints: 0, wins: 0, losses: 0 }));
-      const allCompletedMatches: { match: Match }[] = [];
       const sortedSessions = [...prev.sessions].sort((a, b) => a.date - b.date);
 
       sortedSessions.forEach(s => {
@@ -99,24 +116,19 @@ const App: React.FC = () => {
         sortedRounds.forEach(r => {
           r.matches.forEach(m => {
             if (m.status === 'COMPLETED') {
-              allCompletedMatches.push({ match: m });
+              const p1 = updatedPlayers.find(p => p.id === m.team1.playerIds[0]);
+              const p2 = updatedPlayers.find(p => p.id === m.team1.playerIds[1]);
+              const p3 = updatedPlayers.find(p => p.id === m.team2.playerIds[0]);
+              const p4 = updatedPlayers.find(p => p.id === m.team2.playerIds[1]);
+              if (p1 && p2 && p3 && p4) {
+                const result = calculateNewRatings(p1, p2, p3, p4, m.team1.score!, m.team2.score!);
+                updatedPlayers = updatedPlayers.map(p => result.players.find(u => u.id === p.id) || p);
+                m.individualDeltas = result.individualDeltas;
+                m.pointsDelta = result.delta;
+              }
             }
           });
         });
-      });
-
-      allCompletedMatches.forEach(({ match }) => {
-        const p1 = updatedPlayers.find(p => p.id === match.team1.playerIds[0]);
-        const p2 = updatedPlayers.find(p => p.id === match.team1.playerIds[1]);
-        const p3 = updatedPlayers.find(p => p.id === match.team2.playerIds[0]);
-        const p4 = updatedPlayers.find(p => p.id === match.team2.playerIds[1]);
-        if (p1 && p2 && p3 && p4) {
-          const result = calculateNewRatings(p1, p2, p3, p4, match.team1.score!, match.team2.score!);
-          updatedPlayers = updatedPlayers.map(p => result.players.find(u => u.id === p.id) || p);
-          // Aggiorniamo anche l'oggetto match per consistenza storica se mancassero i delta
-          match.individualDeltas = result.individualDeltas;
-          match.pointsDelta = result.delta;
-        }
       });
       return { ...prev, players: updatedPlayers };
     });
@@ -168,7 +180,6 @@ const App: React.FC = () => {
           rounds: s.rounds.map(r => {
             if (r.id !== roundId) return r;
             if (r.matches.some(m => m.status === 'COMPLETED')) return r;
-
             const oldPid = r.restingPlayerIds[index];
             const resting = r.restingPlayerIds.map((id, i) => i === index ? newPid : id);
             const matches = r.matches.map(m => {
@@ -292,8 +303,8 @@ const App: React.FC = () => {
       </header>
       <main className="flex-1 container mx-auto px-4 py-8">
         {state.currentTab === 'ranking' && <PlayerList players={state.players} onAddPlayer={(n, g, b) => setState(p => p ? ({ ...p, players: [...p.players, { id: Math.random().toString(36).substr(2, 9), name: n, gender: g, wins: 0, losses: 0, basePoints: b, matchPoints: 0, lastActive: Date.now() }] }) : null)} onUpdatePlayer={(id, n, g, b, m) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, name: n, gender: g, basePoints: b, matchPoints: m } : x) }) : null)} onDeletePlayer={(id) => window.confirm("Eliminare?") && setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null)} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} onResetPoints={resetAllPoints} onRecalculate={recalculateRanking} />}
-        {state.currentTab === 'training' && <ActiveTraining session={state.sessions.find(s => s.status === 'ACTIVE')} players={state.players} onStartSession={(ids, date) => setState(p => p ? ({ ...p, sessions: [{ id: Math.random().toString(36).substr(2, 9), date, participantIds: ids, rounds: [], status: 'ACTIVE' }, ...p.sessions], currentTab: 'training' }) : null)} onAddRound={(sid, mode) => setState(prev => { if (!prev) return null; const s = prev.sessions.find(x => x.id === sid); if (!s) return prev; return { ...prev, sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: [...x.rounds, generateRound(prev.players.filter(p => s.participantIds.includes(p.id)), mode, x.rounds.length + 1, x.rounds)] } : x) }; })} onDeleteRound={deleteRound} onUpdateScore={updateMatchScore} onReopenMatch={reopenMatch} onUpdatePlayers={updateMatchPlayers} onUpdateResting={updateRestingPlayer} onArchive={(id) => setState(p => p ? ({ ...p, sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' } : x), currentTab: 'history' }) : null)} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} />}
-        {state.currentTab === 'history' && <TrainingHistory sessions={state.sessions.filter(s => s.status === 'ARCHIVED')} players={state.players} onDeleteRound={deleteRound} onDeleteSession={deleteSession} onUpdateScore={updateMatchScore} onReopenMatch={reopenMatch} onUpdatePlayers={updateMatchPlayers} onUpdateResting={updateRestingPlayer} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} />}
+        {state.currentTab === 'training' && <ActiveTraining attendanceMap={attendanceMap} session={state.sessions.find(s => s.status === 'ACTIVE')} players={state.players} onStartSession={(ids, date) => setState(p => p ? ({ ...p, sessions: [{ id: Math.random().toString(36).substr(2, 9), date, participantIds: ids, rounds: [], status: 'ACTIVE' }, ...p.sessions], currentTab: 'training' }) : null)} onAddRound={(sid, mode) => setState(prev => { if (!prev) return null; const s = prev.sessions.find(x => x.id === sid); if (!s) return prev; return { ...prev, sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: [...x.rounds, generateRound(prev.players.filter(p => s.participantIds.includes(p.id)), mode, x.rounds.length + 1, x.rounds)] } : x) }; })} onDeleteRound={deleteRound} onUpdateScore={updateMatchScore} onReopenMatch={reopenMatch} onUpdatePlayers={updateMatchPlayers} onUpdateResting={updateRestingPlayer} onArchive={(id) => setState(p => p ? ({ ...p, sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' } : x), currentTab: 'history' }) : null)} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} />}
+        {state.currentTab === 'history' && <TrainingHistory onUpdateSessionDate={updateSessionDate} sessions={state.sessions.filter(s => s.status === 'ARCHIVED')} players={state.players} onDeleteRound={deleteRound} onDeleteSession={deleteSession} onUpdateScore={updateMatchScore} onReopenMatch={reopenMatch} onUpdatePlayers={updateMatchPlayers} onUpdateResting={updateRestingPlayer} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} />}
         {state.currentTab === 'stats' && <PlayerStats players={state.players} sessions={state.sessions} selectedPlayerId={state.selectedPlayerId} onSelectPlayer={(id) => setState(p => p ? ({ ...p, selectedPlayerId: id }) : null)} />}
       </main>
       <footer className="py-8 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest border-t border-slate-100 bg-white">&copy; {new Date().getFullYear()} Roundnet Milano</footer>

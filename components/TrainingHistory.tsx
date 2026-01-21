@@ -11,11 +11,12 @@ interface TrainingHistoryProps {
   onReopenMatch: (sid: string, rid: string, mid: string) => void;
   onUpdatePlayers: (sid: string, rid: string, mid: string, team: 1|2, index: 0|1, pid: string) => void;
   onUpdateResting: (sid: string, rid: string, index: number, pid: string) => void;
+  onUpdateSessionDate: (sid: string, newDate: number) => void;
   onSelectPlayer: (id: string) => void;
 }
 
 const TrainingHistory: React.FC<TrainingHistoryProps> = ({ 
-  sessions, players, onDeleteRound, onDeleteSession, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onSelectPlayer 
+  sessions, players, onDeleteRound, onDeleteSession, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onUpdateSessionDate, onSelectPlayer 
 }) => {
   const [matchScores, setMatchScores] = useState<Record<string, { s1: string, s2: string }>>({});
   const getPlayer = (id: string) => players.find(p => p.id === id);
@@ -57,8 +58,22 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
           <details key={session.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden group">
             <summary className="p-6 flex justify-between items-center cursor-pointer hover:bg-slate-50 list-none transition-all">
               <div className="flex items-center gap-6">
-                <div className="bg-red-600 text-white font-black p-3 px-4 rounded-2xl text-[11px] uppercase tracking-widest shadow-lg shadow-red-100 italic">
-                  {new Date(session.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                <div className="relative group/date">
+                  <div className="bg-red-600 text-white font-black p-3 px-4 rounded-2xl text-[11px] uppercase tracking-widest shadow-lg shadow-red-100 italic">
+                    {new Date(session.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </div>
+                  <input 
+                    type="date" 
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    onChange={(e) => { 
+                      if(e.target.value) {
+                         const newTime = new Date(e.target.value).getTime();
+                         onUpdateSessionDate(session.id, newTime);
+                      }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <div className="absolute -top-1 -right-1 bg-slate-900 text-[8px] p-1 rounded-full text-white opacity-0 group-hover/date:opacity-100 transition-opacity">✏️</div>
                 </div>
                 <div>
                   <div className="font-black text-slate-800 uppercase italic tracking-tight">{session.participantIds.length} Atleti presenti</div>
@@ -74,7 +89,6 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
               {session.rounds.map(round => {
                 const conflicts = getConflicts(round);
                 const isRoundLocked = round.matches.some(m => m.status === 'COMPLETED');
-                
                 return (
                   <div key={round.id} className="space-y-6">
                     <div className="flex justify-between items-center">
@@ -90,7 +104,6 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                                const teamIds = t === 1 ? m.team1.playerIds : m.team2.playerIds;
                                const teamScore = t === 1 ? m.team1.score : m.team2.score;
                                const oppScore = t === 1 ? m.team2.score : m.team1.score;
-                               
                                return (
                                 <div key={t} className={`space-y-3 ${t === 2 ? 'text-right' : ''}`}>
                                   <div className={`flex justify-between items-center ${t === 2 ? 'flex-row-reverse' : ''}`}>
@@ -151,24 +164,6 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                         </div>
                       ))}
                     </div>
-                    {round.restingPlayerIds.length > 0 && (
-                      <div className={`p-4 rounded-2xl border-2 border-dashed flex flex-wrap gap-4 items-center ${conflicts.size > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200 shadow-sm'} ${isRoundLocked ? 'border-solid border-slate-100 bg-slate-50' : ''}`}>
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${conflicts.size > 0 ? 'text-red-600' : 'text-slate-400'}`}>Riposo:</span>
-                        {round.restingPlayerIds.map((id, idx) => (
-                          <React.Fragment key={idx}>
-                            {isRoundLocked ? (
-                              <span className="text-[12px] font-black px-3 py-1 bg-white rounded-lg border border-slate-100 text-slate-600 shadow-sm">
-                                {getPlayer(id)?.name || '???'}
-                              </span>
-                            ) : (
-                              <select key={idx} value={id} onChange={(e) => onUpdateResting(session.id, round.id, idx, e.target.value)} className={`text-[11px] font-bold p-1.5 border rounded-xl outline-none shadow-sm ${conflicts.has(id) ? 'border-red-500 text-red-600 bg-red-50' : 'bg-slate-50 border-slate-200 focus:border-red-600'}`}>
-                                {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                              </select>
-                            )}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 );
               })}

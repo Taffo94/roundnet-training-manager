@@ -65,7 +65,6 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
     const findTop = (data: Record<string, any>, criteria: (id: string, d: any) => number) => {
       let topId = '';
       let topVal = -1;
-      
       Object.entries(data).forEach(([id, d]) => {
         const val = criteria(id, d);
         if (val > topVal) {
@@ -73,7 +72,6 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
           topId = id;
         }
       });
-      
       const player = players.find(p => p.id === topId);
       return player ? { ...player, ...data[topId], val: topVal } : null;
     };
@@ -154,7 +152,7 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
                 <div className="flex gap-4 text-xs font-bold uppercase tracking-widest text-slate-400 justify-center md:justify-start">
                    <span>{selectedPlayer.gender === 'M' ? 'Uomo' : 'Donna'}</span>
                    <span>•</span>
-                   <span>{selectedPlayer.basePoints + selectedPlayer.matchPoints} Punti Ranking</span>
+                   <span>{Math.round(selectedPlayer.basePoints + selectedPlayer.matchPoints)} Punti Ranking</span>
                 </div>
              </div>
              <div className="flex gap-12 text-center relative z-10">
@@ -170,67 +168,22 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
                 </div>
              </div>
           </div>
-
           <div className="space-y-4">
             <h3 className="text-sm font-black text-slate-800 uppercase italic tracking-widest border-l-4 border-green-500 pl-3">Compagni di Squadra</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <StatCard 
-                title="Compagno Vincente" 
-                player={stats.partners.wins} 
-                subtitle={`${stats.partners.wins?.wins || 0} Vittorie insieme`}
-                icon="🤝" 
-                color="bg-green-50 text-green-600"
-                help="Il giocatore con cui hai ottenuto il maggior numero assoluto di vittorie."
-              />
-              <StatCard 
-                title="Affinità Tecnica" 
-                player={stats.partners.wr} 
-                subtitle={`${((stats.partners.wr?.wins / stats.partners.wr?.total) * 100 || 0).toFixed(0)}% Win Rate`}
-                icon="📈" 
-                color="bg-blue-50 text-blue-600"
-                help="Il compagno con cui hai la percentuale di vittoria più alta (minimo 1 partita)."
-              />
-              <StatCard 
-                title="Partner Fedele" 
-                player={stats.partners.freq} 
-                subtitle={`${stats.partners.freq?.total || 0} Partite giocate`}
-                icon="🔄" 
-                color="bg-slate-100 text-slate-600"
-                help="Il giocatore con cui sei stato accoppiato più spesso."
-              />
+              <StatCard title="Compagno Vincente" player={stats.partners.wins} subtitle={`${stats.partners.wins?.wins || 0} Vittorie insieme`} icon="🤝" color="bg-green-50 text-green-600" help="Il giocatore con cui hai ottenuto il maggior numero assoluto di vittorie." />
+              <StatCard title="Affinità Tecnica" player={stats.partners.wr} subtitle={`${((stats.partners.wr?.wins / stats.partners.wr?.total) * 100 || 0).toFixed(0)}% Win Rate`} icon="📈" color="bg-blue-50 text-blue-600" help="Il compagno con cui hai la percentuale di vittoria più alta (minimo 1 partita)." />
+              <StatCard title="Partner Fedele" player={stats.partners.freq} subtitle={`${stats.partners.freq?.total || 0} Partite giocate`} icon="🔄" color="bg-slate-100 text-slate-600" help="Il giocatore con cui sei stato accoppiato più spesso." />
             </div>
           </div>
-
           <div className="space-y-4">
             <h3 className="text-sm font-black text-slate-800 uppercase italic tracking-widest border-l-4 border-red-500 pl-3">Avversari & Rivali</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <StatCard 
-                title="Bestia Nera" 
-                player={stats.opponents.losses} 
-                subtitle={`Ti ha battuto ${stats.opponents.losses?.losses || 0} volte`}
-                icon="🔥" 
-                color="bg-red-50 text-red-600"
-                help="L'avversario che ti ha inflitto il maggior numero di sconfitte."
-              />
-              <StatCard 
-                title="Incubo" 
-                player={stats.opponents.lr} 
-                subtitle={`${((stats.opponents.lr?.losses / stats.opponents.lr?.total) * 100 || 0).toFixed(0)}% Sconfitte`}
-                icon="💀" 
-                color="bg-orange-50 text-orange-600"
-                help="L'avversario contro cui hai la percentuale di sconfitta più alta."
-              />
-              <StatCard 
-                title="Rivale Storico" 
-                player={stats.opponents.freq} 
-                subtitle={`${stats.opponents.freq?.total || 0} Scontri diretti`}
-                icon="⚔️" 
-                color="bg-slate-100 text-slate-600"
-                help="L'avversario che hai affrontato più volte in assoluto."
-              />
+              <StatCard title="Bestia Nera" player={stats.opponents.losses} subtitle={`Ti ha battuto ${stats.opponents.losses?.losses || 0} volte`} icon="🔥" color="bg-red-50 text-red-600" help="L'avversario che ti ha inflitto il maggior numero di sconfitte." />
+              <StatCard title="Incubo" player={stats.opponents.lr} subtitle={`${((stats.opponents.lr?.losses / stats.opponents.lr?.total) * 100 || 0).toFixed(0)}% Sconfitte`} icon="💀" color="bg-orange-50 text-orange-600" help="L'avversario contro cui hai la percentuale di sconfitta più alta." />
+              <StatCard title="Rivale Storico" player={stats.opponents.freq} subtitle={`${stats.opponents.freq?.total || 0} Scontri diretti`} icon="⚔️" color="bg-slate-100 text-slate-600" help="L'avversario che hai affrontato più volte in assoluto." />
             </div>
           </div>
-
           <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="px-8 py-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
               <h3 className="font-black text-slate-800 uppercase italic text-sm">Cronologia Recente (Ultimi 10)</h3>
@@ -243,13 +196,10 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
                 const won = myTeam.score! > oppTeam.score!;
                 const tied = myTeam.score! === oppTeam.score!;
                 const partnerId = myTeam.playerIds.find(id => id !== selectedPlayerId);
-
                 return (
                   <div key={match.id} className="px-8 py-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
                     <div className="flex items-center gap-6">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-black shadow-inner ${
-                        tied ? 'bg-blue-100 text-blue-600' : won ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
-                      }`}>
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-black shadow-inner ${tied ? 'bg-blue-100 text-blue-600' : won ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
                         {tied ? 'PAR' : won ? 'VIN' : 'PER'}
                       </div>
                       <div>
@@ -287,7 +237,6 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
           </div>
         </div>
       )}
-      
       {!selectedPlayer && (
         <div className="text-center py-32 bg-white rounded-3xl border-2 border-dashed border-slate-200">
           <div className="text-4xl mb-4">📊</div>

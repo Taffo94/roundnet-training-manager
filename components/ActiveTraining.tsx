@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Player, TrainingSession, MatchmakingMode, Round } from '../types';
 
 interface ActiveTrainingProps {
   session?: TrainingSession;
   players: Player[];
+  attendanceMap: Record<string, number>;
   onStartSession: (ids: string[], date: number) => void;
   onAddRound: (sessionId: string, mode: MatchmakingMode) => void;
   onDeleteRound: (sessionId: string, roundId: string) => void;
@@ -26,7 +27,7 @@ const getNextMonday = () => {
 };
 
 const ActiveTraining: React.FC<ActiveTrainingProps> = ({ 
-  session, players, onStartSession, onAddRound, onDeleteRound, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onArchive, onSelectPlayer 
+  session, players, attendanceMap, onStartSession, onAddRound, onDeleteRound, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onArchive, onSelectPlayer 
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [matchScores, setMatchScores] = useState<Record<string, { s1: string, s2: string }>>({});
@@ -35,6 +36,16 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
   const togglePlayer = (id: string) => setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   const getPlayer = (id: string) => players.find(p => p.id === id);
   const participants = session ? players.filter(p => session.participantIds.includes(p.id)).sort((a,b) => a.name.localeCompare(b.name)) : [];
+
+  // Ordinamento per presenze storiche (LOYALTY)
+  const sortedByAttendance = useMemo(() => {
+    return [...players].sort((a, b) => {
+      const attA = attendanceMap[a.id] || 0;
+      const attB = attendanceMap[b.id] || 0;
+      if (attB !== attA) return attB - attA;
+      return a.name.localeCompare(b.name);
+    });
+  }, [players, attendanceMap]);
 
   const getTeamPoints = (ids: string[]) => {
     const total = ids.reduce((acc, id) => {
@@ -65,23 +76,36 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
     return (
       <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-2xl border border-slate-100 p-10 space-y-10">
         <div className="text-center">
-          <h2 className="text-4xl font-black text-slate-800 uppercase italic tracking-tighter">Nuova Sessione</h2>
-          <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mt-2">Default: Prossimo Lunedì</p>
+          <h2 className="text-4xl font-black text-slate-800 uppercase italic tracking-tighter leading-tight">Nuovo Allenamento</h2>
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-2">Gli atleti sono ordinati per frequenza di presenza</p>
         </div>
+        
         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Data Allenamento</label>
-          <input type="date" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} className="w-full p-4 bg-white border border-slate-200 rounded-xl font-black text-slate-800 outline-none focus:ring-2 focus:ring-red-600/20" />
+          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 px-1">Seleziona Data</label>
+          <input 
+            type="date" 
+            value={sessionDate} 
+            onChange={(e) => setSessionDate(e.target.value)} 
+            className="w-full p-4 bg-white border border-slate-200 rounded-xl font-black text-slate-800 outline-none focus:ring-4 focus:ring-red-600/10 focus:border-red-600 transition-all" 
+          />
         </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {players.sort((a,b) => a.name.localeCompare(b.name)).map(p => (
-            <button key={p.id} onClick={() => togglePlayer(p.id)} className={`p-4 rounded-2xl border-2 text-sm font-bold transition-all text-left flex flex-col ${selectedIds.includes(p.id) ? 'bg-red-600 border-red-600 text-white shadow-lg transform scale-105' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-red-300'}`}>
-              <span className="truncate">{p.name}</span>
-              <span className={`text-[9px] font-black mt-1 uppercase tracking-widest ${selectedIds.includes(p.id) ? 'text-white/60' : 'text-slate-400'}`}>{p.gender} • {Math.round(p.basePoints + p.matchPoints)} PT</span>
-            </button>
-          ))}
+          {sortedByAttendance.map(p => {
+            const att = attendanceMap[p.id] || 0;
+            return (
+              <button key={p.id} onClick={() => togglePlayer(p.id)} className={`p-4 rounded-2xl border-2 text-sm font-bold transition-all text-left flex flex-col group ${selectedIds.includes(p.id) ? 'bg-red-600 border-red-600 text-white shadow-lg transform scale-105' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-red-300'}`}>
+                <div className="flex justify-between items-start w-full">
+                   <span className="truncate">{p.name}</span>
+                   {att > 0 && <span className={`text-[8px] font-black px-1.5 rounded-full ${selectedIds.includes(p.id) ? 'bg-white/20' : 'bg-slate-200'}`}>{att}P</span>}
+                </div>
+                <span className={`text-[9px] font-black mt-1 uppercase tracking-widest ${selectedIds.includes(p.id) ? 'text-white/60' : 'text-slate-400'}`}>{p.gender} • {Math.round(p.basePoints + p.matchPoints)} PT</span>
+              </button>
+            );
+          })}
         </div>
         <div className="flex flex-col items-center gap-4">
-          <button onClick={() => onStartSession(selectedIds, new Date(sessionDate).getTime())} disabled={selectedIds.length < 4} className="bg-slate-900 text-white px-16 py-5 rounded-2xl font-black uppercase tracking-widest disabled:opacity-30 shadow-2xl hover:bg-black transition-all">Inizia Allenamento ({selectedIds.length})</button>
+          <button onClick={() => onStartSession(selectedIds, new Date(sessionDate).getTime())} disabled={selectedIds.length < 4} className="bg-slate-900 text-white px-16 py-5 rounded-2xl font-black uppercase tracking-widest disabled:opacity-30 shadow-2xl hover:bg-black transition-all transform hover:-translate-y-1 active:translate-y-0">Inizia Allenamento ({selectedIds.length})</button>
         </div>
       </div>
     );
@@ -126,7 +150,6 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                         const teamIds = t === 1 ? m.team1.playerIds : m.team2.playerIds;
                         const oppScore = t === 1 ? m.team2.score : m.team1.score;
                         const teamScore = t === 1 ? m.team1.score : m.team2.score;
-                        
                         return (
                           <div key={t} className={`space-y-4 ${t === 2 ? 'text-right' : ''}`}>
                             <div className={`flex justify-between items-center ${t === 2 ? 'flex-row-reverse' : ''}`}>
