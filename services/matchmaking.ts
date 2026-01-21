@@ -117,28 +117,37 @@ export const generateRound = (
       matches.push(createMatch(shuffledBlock[0], shuffledBlock[1], shuffledBlock[2], shuffledBlock[3], mode));
     }
   } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
-    // LOGICA "WRAPPING" (Richiesta Utente):
-    // Partiamo dall'intera lista ordinata.
-    // Prendiamo il Migliore (Top) e il Peggiore (Bottom) dell'intera lista -> Team 1
-    // Li facciamo scontrare con i due giocatori che si trovano al centro della lista rimanente -> Team 2
+    // LOGICA "OPTIMIZED WRAPPING" (Richiesta Utente):
+    // 1. Ordiniamo tutta la lista dei presenti per punteggio.
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
     
     while (playersToPair.length >= 4) {
-      const best = playersToPair.shift()!; // Primo assoluto
-      const worst = playersToPair.pop()!;  // Ultimo assoluto
-      
-      // Trova i due centrali nella lista rimanente
-      const mid = Math.floor(playersToPair.length / 2);
-      // Prendiamo i due elementi attorno al centro. 
-      // Se dispari, prendiamo mid e mid-1. Se pari, mid e mid-1.
-      const mid1Index = Math.max(0, mid - 1);
-      const pMid1 = playersToPair.splice(mid1Index, 1)[0];
-      const pMid2 = playersToPair.splice(mid1Index, 1)[0]; // midIndex ora punta al successivo
+      // 2. Creiamo il Team A con il migliore (Top) e il peggiore (Bottom) rimasti.
+      const top = playersToPair.shift()!;
+      const bottom = playersToPair.pop()!;
+      const targetScore = getTot(top) + getTot(bottom);
 
-      matches.push(createMatch(best, worst, pMid1, pMid2, mode));
+      // 3. Cerchiamo nel pool rimanente la coppia (Team B) che più si avvicina al targetScore.
+      let bestDiff = Infinity;
+      let pairIndices = [0, 1];
+
+      for (let i = 0; i < playersToPair.length; i++) {
+        for (let j = i + 1; j < playersToPair.length; j++) {
+          const currentPairScore = getTot(playersToPair[i]) + getTot(playersToPair[j]);
+          const diff = Math.abs(currentPairScore - targetScore);
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            pairIndices = [i, j];
+          }
+        }
+      }
+
+      // 4. Rimuoviamo i due giocatori scelti (rimuovendo prima l'indice più alto per non sfasare gli indici).
+      const p2 = playersToPair.splice(pairIndices[1], 1)[0];
+      const p1 = playersToPair.splice(pairIndices[0], 1)[0];
+
+      matches.push(createMatch(top, bottom, p1, p2, mode));
     }
-    // Se rimangono giocatori (es. 2 o 3 per errori di logica esterna, ma qui sono sempre multipli di 4)
-    // andrebbero gestiti, ma la logica 'numMatches' garantisce il pool corretto.
   } else if (mode === MatchmakingMode.GENDER_BALANCED) {
     const males = shuffle(playersToPair.filter(p => p.gender === 'M'));
     const females = shuffle(playersToPair.filter(p => p.gender === 'F'));
