@@ -58,22 +58,8 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
           <details key={session.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden group">
             <summary className="p-6 flex justify-between items-center cursor-pointer hover:bg-slate-50 list-none transition-all">
               <div className="flex items-center gap-6">
-                <div className="relative group/date">
-                  <div className="bg-red-600 text-white font-black p-3 px-4 rounded-2xl text-[11px] uppercase tracking-widest shadow-lg shadow-red-100 italic">
-                    {new Date(session.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
-                  </div>
-                  <input 
-                    type="date" 
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                    onChange={(e) => { 
-                      if(e.target.value) {
-                         const newTime = new Date(e.target.value).getTime();
-                         onUpdateSessionDate(session.id, newTime);
-                      }
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  <div className="absolute -top-1 -right-1 bg-slate-900 text-[8px] p-1 rounded-full text-white opacity-0 group-hover/date:opacity-100 transition-opacity">✏️</div>
+                <div className="bg-red-600 text-white font-black p-3 px-4 rounded-2xl text-[11px] uppercase tracking-widest shadow-lg shadow-red-100 italic">
+                  {new Date(session.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
                 </div>
                 <div>
                   <div className="font-black text-slate-800 uppercase italic tracking-tight">{session.participantIds.length} Atleti presenti</div>
@@ -86,6 +72,22 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
               </div>
             </summary>
             <div className="p-8 border-t border-slate-100 bg-slate-50/50 space-y-10">
+              <div className="flex justify-start items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Riepilogo Sessione:</span>
+                 <div className="relative">
+                    <button className="text-[10px] font-black text-red-600 hover:underline flex items-center gap-1">
+                       ✏️ Modifica Data
+                    </button>
+                    <input 
+                      type="date" 
+                      className="absolute inset-0 opacity-0 cursor-pointer" 
+                      onChange={(e) => {
+                        if(e.target.value) onUpdateSessionDate(session.id, new Date(e.target.value).getTime());
+                      }}
+                    />
+                 </div>
+              </div>
+
               {session.rounds.map(round => {
                 const conflicts = getConflicts(round);
                 const isRoundLocked = round.matches.some(m => m.status === 'COMPLETED');

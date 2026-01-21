@@ -13,6 +13,7 @@ interface ActiveTrainingProps {
   onReopenMatch: (sid: string, rid: string, mid: string) => void;
   onUpdatePlayers: (sid: string, rid: string, mid: string, team: 1|2, index: 0|1, pid: string) => void;
   onUpdateResting: (sid: string, rid: string, index: number, pid: string) => void;
+  onUpdateSessionDate: (sid: string, newDate: number) => void;
   onArchive: (sessionId: string) => void;
   onSelectPlayer: (id: string) => void;
 }
@@ -27,7 +28,7 @@ const getNextMonday = () => {
 };
 
 const ActiveTraining: React.FC<ActiveTrainingProps> = ({ 
-  session, players, attendanceMap, onStartSession, onAddRound, onDeleteRound, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onArchive, onSelectPlayer 
+  session, players, attendanceMap, onStartSession, onAddRound, onDeleteRound, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onUpdateSessionDate, onArchive, onSelectPlayer 
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [matchScores, setMatchScores] = useState<Record<string, { s1: string, s2: string }>>({});
@@ -37,7 +38,6 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
   const getPlayer = (id: string) => players.find(p => p.id === id);
   const participants = session ? players.filter(p => session.participantIds.includes(p.id)).sort((a,b) => a.name.localeCompare(b.name)) : [];
 
-  // Ordinamento per presenze storiche (LOYALTY)
   const sortedByAttendance = useMemo(() => {
     return [...players].sort((a, b) => {
       const attA = attendanceMap[a.id] || 0;
@@ -114,9 +114,23 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
   return (
     <div className="space-y-10 max-w-5xl mx-auto">
       <div className="flex justify-between items-end border-b-2 border-slate-100 pb-6">
-        <div>
+        <div className="relative group/head">
           <h2 className="text-3xl font-black text-slate-800 uppercase italic tracking-tighter leading-tight">Sessione Attiva</h2>
-          <p className="text-[11px] font-black text-red-600 uppercase tracking-[0.2em]">{new Date(session.date).toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long' })}</p>
+          <div className="flex items-center gap-3">
+            <p className="text-[11px] font-black text-red-600 uppercase tracking-[0.2em]">{new Date(session.date).toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long' })}</p>
+            <div className="relative">
+              <button className="text-[9px] font-black uppercase text-slate-300 hover:text-red-500 flex items-center gap-1 transition-colors">
+                 ✏️ Modifica Data
+              </button>
+              <input 
+                type="date" 
+                className="absolute inset-0 opacity-0 cursor-pointer" 
+                onChange={(e) => {
+                  if(e.target.value) onUpdateSessionDate(session.id, new Date(e.target.value).getTime());
+                }}
+              />
+            </div>
+          </div>
         </div>
         <button onClick={() => onArchive(session.id)} className="bg-slate-900 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase shadow-lg hover:bg-black transition-all">Archivia Sessione</button>
       </div>

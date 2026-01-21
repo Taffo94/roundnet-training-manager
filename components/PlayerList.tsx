@@ -15,7 +15,7 @@ interface PlayerListProps {
 const InfoTooltip = ({ text, position = 'bottom' }: { text: string, position?: 'top' | 'bottom' }) => (
   <span className="ml-1 cursor-help group relative inline-block">
     <span className="text-slate-400 font-bold bg-slate-100 rounded-full w-4 h-4 inline-flex items-center justify-center text-[10px]">?</span>
-    <span className={`pointer-events-none absolute ${position === 'bottom' ? 'bottom-full mb-2' : 'top-full mt-2'} left-1/2 -translate-x-1/2 w-48 p-2 bg-slate-900 text-white text-[10px] font-normal normal-case rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-[100] shadow-2xl`}>
+    <span className={`pointer-events-none absolute ${position === 'bottom' ? 'bottom-full mb-2' : 'top-full mt-2'} left-1/2 -translate-x-1/2 w-48 p-2 bg-slate-900 text-white text-[10px] font-normal normal-case rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-[999] shadow-2xl`}>
       {text}
       <span className={`absolute ${position === 'bottom' ? 'top-full border-t-slate-900' : 'bottom-full border-b-slate-900'} left-1/2 -translate-x-1/2 border-8 border-transparent`}></span>
     </span>
@@ -123,8 +123,8 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
         {error && <p className="text-red-500 text-[10px] font-bold uppercase mt-2">{error}</p>}
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
+      <div className="overflow-x-auto overflow-visible">
+        <table className="w-full text-left border-collapse">
           <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold border-b border-slate-200">
             <tr>
               <th className="px-6 py-3">Rank</th>
@@ -132,15 +132,15 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
               <th className="px-6 py-3 text-center">Sesso</th>
               <th className="px-6 py-3 text-center">
                 Punti Base
-                <InfoTooltip text="Punti iniziali assegnati in base al livello tecnico stimato." />
+                <InfoTooltip text="Punti iniziali assegnati in base al livello tecnico stimato." position="top" />
               </th>
               <th className="px-6 py-3 text-center">
                 Match
-                <InfoTooltip text="Punti accumulati o persi tramite logica Elo (K=12, Bonus Margin ≥ 7)." />
+                <InfoTooltip text="Punti accumulati o persi tramite logica Elo (K=12, Bonus Margin ≥ 7)." position="top" />
               </th>
               <th className="px-6 py-3 text-center text-red-600 font-black italic">
                 Totale
-                <InfoTooltip text="Somma di Punti Base e Match che determina la posizione in classifica." />
+                <InfoTooltip text="Somma di Punti Base e Match che determina la posizione in classifica." position="top" />
               </th>
               <th className="px-6 py-3 text-center">V / S</th>
               <th className="px-6 py-3"></th>
