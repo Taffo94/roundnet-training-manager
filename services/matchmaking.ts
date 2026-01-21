@@ -95,14 +95,14 @@ export const generateRound = (
     });
   });
 
-  let pool = [...allParticipants];
+  const pool = [...allParticipants];
   const sortedByRest = [...pool].sort((a, b) => restCounts[a.id] - restCounts[b.id]);
   const restingPlayers = numResting > 0 ? sortedByRest.slice(0, numResting) : [];
   const restingIds = restingPlayers.map(p => p.id);
   const activePlayers = pool.filter(p => !restingIds.includes(p.id));
 
   const matches: Match[] = [];
-  let playersToPair = [...activePlayers];
+  const playersToPair = [...activePlayers];
   const getTot = (p: Player) => p.basePoints + p.matchPoints;
 
   if (mode === MatchmakingMode.CUSTOM) {
@@ -110,23 +110,35 @@ export const generateRound = (
       matches.push(createMatch({id: ''}, {id: ''}, {id: ''}, {id: ''}, mode));
     }
   } else if (mode === MatchmakingMode.SAME_LEVEL) {
-    // Ordiniamo per livello e creiamo blocchi di 4 giocatori vicini tra loro
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
     for (let i = 0; i < numMatches; i++) {
       const block = playersToPair.splice(0, 4);
-      const shuffledBlock = shuffle(block); // In SAME_LEVEL mischiamo i 4 di pari livello
+      const shuffledBlock = shuffle(block);
       matches.push(createMatch(shuffledBlock[0], shuffledBlock[1], shuffledBlock[2], shuffledBlock[3], mode));
     }
   } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
-    // LOGICA BALANCED PAIRS: Migliore + Peggiore vs i due Centrali
-    // Esempio: P1(100), P2(80), P3(75), P4(50)
-    // Risultato: Team 1 (P1+P4) = 150 vs Team 2 (P2+P3) = 155
-    // Questo bilancia la somma totale massimizzando la diversità interna
+    // LOGICA "WRAPPING" (Richiesta Utente):
+    // Partiamo dall'intera lista ordinata.
+    // Prendiamo il Migliore (Top) e il Peggiore (Bottom) dell'intera lista -> Team 1
+    // Li facciamo scontrare con i due giocatori che si trovano al centro della lista rimanente -> Team 2
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
-    for (let i = 0; i < numMatches; i++) {
-      const block = playersToPair.splice(0, 4);
-      matches.push(createMatch(block[0], block[3], block[1], block[2], mode));
+    
+    while (playersToPair.length >= 4) {
+      const best = playersToPair.shift()!; // Primo assoluto
+      const worst = playersToPair.pop()!;  // Ultimo assoluto
+      
+      // Trova i due centrali nella lista rimanente
+      const mid = Math.floor(playersToPair.length / 2);
+      // Prendiamo i due elementi attorno al centro. 
+      // Se dispari, prendiamo mid e mid-1. Se pari, mid e mid-1.
+      const mid1Index = Math.max(0, mid - 1);
+      const pMid1 = playersToPair.splice(mid1Index, 1)[0];
+      const pMid2 = playersToPair.splice(mid1Index, 1)[0]; // midIndex ora punta al successivo
+
+      matches.push(createMatch(best, worst, pMid1, pMid2, mode));
     }
+    // Se rimangono giocatori (es. 2 o 3 per errori di logica esterna, ma qui sono sempre multipli di 4)
+    // andrebbero gestiti, ma la logica 'numMatches' garantisce il pool corretto.
   } else if (mode === MatchmakingMode.GENDER_BALANCED) {
     const males = shuffle(playersToPair.filter(p => p.gender === 'M'));
     const females = shuffle(playersToPair.filter(p => p.gender === 'F'));
@@ -142,9 +154,9 @@ export const generateRound = (
       matches.push(createMatch(t1[0], t1[1], t2[0], t2[1], mode));
     }
   } else if (mode === MatchmakingMode.FULL_RANDOM) {
-    playersToPair = shuffle(playersToPair);
+    const shuffled = shuffle(playersToPair);
     for (let i = 0; i < numMatches; i++) {
-      const p = playersToPair.splice(0, 4);
+      const p = shuffled.splice(0, 4);
       matches.push(createMatch(p[0], p[1], p[2], p[3], mode));
     }
   }

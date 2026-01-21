@@ -58,7 +58,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
           <details key={session.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden group">
             <summary className="p-6 flex justify-between items-center cursor-pointer hover:bg-slate-50 list-none transition-all">
               <div className="flex items-center gap-6">
-                <div className="bg-red-600 text-white font-black p-3 px-4 rounded-2xl text-[11px] uppercase tracking-widest shadow-lg shadow-red-100 italic">
+                <div className="bg-red-600 text-white font-black p-4 px-5 rounded-2xl text-[11px] uppercase tracking-widest shadow-lg shadow-red-100 italic">
                   {new Date(session.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
                 </div>
                 <div>
@@ -72,12 +72,15 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
               </div>
             </summary>
             <div className="p-8 border-t border-slate-100 bg-slate-50/50 space-y-10">
-              {/* MODIFICA DATA INTERNA PER EVITARE BUG ACCORDION */}
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                <div className="text-[11px] font-black uppercase text-slate-400 tracking-widest">Dati Sessione:</div>
+              {/* MODIFICA DATA INTERNA */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Data Registrata:</span>
+                  <span className="text-sm font-black text-slate-800 uppercase tracking-tight">{new Date(session.date).toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                </div>
                 <div className="relative">
-                  <button className="text-[10px] font-black text-red-600 hover:text-red-700 underline flex items-center gap-1 transition-colors">
-                    ✏️ Modifica Data Allenamento
+                  <button className="bg-slate-50 border border-slate-200 px-6 py-2.5 rounded-xl text-[10px] font-black text-red-600 hover:bg-red-50 transition-all uppercase tracking-widest shadow-sm">
+                    ✏️ Modifica Data
                   </button>
                   <input 
                     type="date" 
@@ -91,7 +94,6 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
 
               {session.rounds.map(round => {
                 const conflicts = getConflicts(round);
-                const isRoundLocked = round.matches.some(m => m.status === 'COMPLETED');
                 return (
                   <div key={round.id} className="space-y-6">
                     <div className="flex justify-between items-center">
