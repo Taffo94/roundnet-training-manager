@@ -9,6 +9,7 @@ interface ActiveTrainingProps {
   onStartSession: (ids: string[], date: number) => void;
   onAddRound: (sessionId: string, mode: MatchmakingMode) => void;
   onDeleteRound: (sessionId: string, roundId: string) => void;
+  onRefreshRound: (sessionId: string, roundId: string) => void;
   onUpdateScore: (sid: string, rid: string, mid: string, s1: number, s2: number) => void;
   onReopenMatch: (sid: string, rid: string, mid: string) => void;
   onUpdatePlayers: (sid: string, rid: string, mid: string, team: 1|2, index: 0|1, pid: string) => void;
@@ -29,7 +30,7 @@ const getNextMonday = () => {
 };
 
 const ActiveTraining: React.FC<ActiveTrainingProps> = ({ 
-  session, players, attendanceMap, onStartSession, onAddRound, onDeleteRound, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onUpdateSessionDate, onArchive, onSelectPlayer, onEditParticipants
+  session, players, attendanceMap, onStartSession, onAddRound, onDeleteRound, onRefreshRound, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onUpdateSessionDate, onArchive, onSelectPlayer, onEditParticipants
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>(session?.participantIds || []);
   const [matchScores, setMatchScores] = useState<Record<string, { s1: string, s2: string }>>({});
@@ -205,12 +206,32 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                     <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-green-500/30">In corso / Bloccato</span>
                   )}
                 </div>
-                {conflicts.size > 0 && (
-                  <span className="bg-red-500 text-white text-[9px] px-3 py-1 rounded-full font-black animate-pulse flex items-center gap-2 border border-red-400 shadow-sm">
-                    ⚠️ CONFLITTO GIOCATORI
-                  </span>
-                )}
-                <button onClick={() => onDeleteRound(session.id, round.id)} className="text-white/40 hover:text-red-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                <div className="flex items-center gap-4">
+                  {conflicts.size > 0 && (
+                    <span className="bg-red-500 text-white text-[9px] px-3 py-1 rounded-full font-black animate-pulse flex items-center gap-2 border border-red-400 shadow-sm">
+                      ⚠️ CONFLITTO GIOCATORI
+                    </span>
+                  )}
+                  
+                  <div className="flex items-center gap-2">
+                    {!isRoundLocked && (
+                      <button 
+                        onClick={() => onRefreshRound(session.id, round.id)} 
+                        className="text-white/40 hover:text-blue-400 transition-all hover:rotate-180 duration-500 p-1"
+                        title="Rigenera Round"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      </button>
+                    )}
+                    <button onClick={() => onDeleteRound(session.id, round.id)} className="text-white/40 hover:text-red-400 transition-colors p-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               </div>
               <div className="p-8 space-y-6">
                 {round.matches.map(m => (

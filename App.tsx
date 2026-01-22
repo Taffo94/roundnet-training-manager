@@ -263,6 +263,35 @@ const App: React.FC = () => {
     });
   };
 
+  const refreshRound = (sessionId: string, roundId: string) => {
+    setState(prev => {
+      if (!prev) return null;
+      const s = prev.sessions.find(x => x.id === sessionId);
+      if (!s) return prev;
+      const roundIndex = s.rounds.findIndex(r => r.id === roundId);
+      if (roundIndex === -1) return prev;
+      
+      const targetRound = s.rounds[roundIndex];
+      if (targetRound.matches.some(m => m.status === 'COMPLETED')) {
+        alert("Impossibile rigenerare un round con partite già concluse.");
+        return prev;
+      }
+
+      // Prendi solo i round precedenti per il calcolo delle partnership
+      const previousRounds = s.rounds.slice(0, roundIndex);
+      const participants = prev.players.filter(p => s.participantIds.includes(p.id));
+      const newRound = generateRound(participants, targetRound.mode, targetRound.roundNumber, previousRounds);
+      
+      return {
+        ...prev,
+        sessions: prev.sessions.map(session => session.id === sessionId ? {
+          ...session,
+          rounds: session.rounds.map(r => r.id === roundId ? newRound : r)
+        } : session)
+      };
+    });
+  };
+
   const deleteSession = (sessionId: string) => {
     if (!window.confirm("Eliminare intera sessione e stornare tutti i punti?")) return;
     setState(prev => {
@@ -473,6 +502,7 @@ const App: React.FC = () => {
             onStartSession={(ids, date) => setState(p => p ? ({ ...p, sessions: [{ id: Math.random().toString(36).substr(2, 9), date, participantIds: ids, rounds: [], status: 'ACTIVE' }, ...p.sessions], currentTab: 'training' }) : null)} 
             onAddRound={(sid, mode) => setState(prev => { if (!prev) return null; const s = prev.sessions.find(x => x.id === sid); if (!s) return prev; return { ...prev, sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: [...x.rounds, generateRound(prev.players.filter(p => s.participantIds.includes(p.id)), mode, x.rounds.length + 1, x.rounds)] } : x) }; })} 
             onDeleteRound={deleteRound} 
+            onRefreshRound={refreshRound}
             onUpdateScore={updateMatchScore} 
             onReopenMatch={reopenMatch} 
             onUpdatePlayers={updateMatchPlayers} 
