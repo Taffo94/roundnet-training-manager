@@ -10,6 +10,8 @@ import PlayerStats from './components/PlayerStats';
 
 import logoImg from './logo.png';
 
+const AUTH_STORAGE_KEY = 'rmi_auth_session';
+
 const Logo = () => {
   const [error, setError] = useState(false);
   return (
@@ -34,7 +36,13 @@ const Logo = () => {
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState | null>(null);
-  const [auth, setAuth] = useState<AuthMode>(null);
+  
+  // Inizializza l'auth dal localStorage se presente
+  const [auth, setAuth] = useState<AuthMode>(() => {
+    const savedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
+    return (savedAuth as AuthMode) || null;
+  });
+
   const [adminPassword, setAdminPassword] = useState('');
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [loginError, setLoginError] = useState('');
@@ -42,6 +50,15 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [dbError, setDbError] = useState<{message: string, details?: string} | null>(null);
   const isInitialMount = useRef(true);
+
+  // Effetto per persistere l'auth quando cambia
+  useEffect(() => {
+    if (auth) {
+      localStorage.setItem(AUTH_STORAGE_KEY, auth);
+    } else {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+    }
+  }, [auth]);
 
   useEffect(() => {
     const config = getSupabaseConfig();
@@ -82,6 +99,12 @@ const App: React.FC = () => {
     } else {
       setLoginError('Password Errata');
     }
+  };
+
+  const handleLogout = () => {
+    setAuth(null);
+    setAdminPassword('');
+    setShowAdminLogin(false);
   };
 
   const updateSessionDate = (sessionId: string, newDate: number) => {
@@ -369,7 +392,7 @@ const App: React.FC = () => {
                 <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${isAdmin ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-slate-100 text-slate-500 border border-slate-200'} uppercase`}>
                   {isAdmin ? 'Admin' : 'Atleta'}
                 </span>
-                <button onClick={() => setAuth(null)} className="text-[9px] font-black text-slate-400 hover:text-red-600 uppercase transition-colors">Logout</button>
+                <button onClick={handleLogout} className="text-[9px] font-black text-slate-400 hover:text-red-600 uppercase transition-colors">Logout</button>
               </div>
             </div>
           </div>
@@ -410,6 +433,7 @@ const App: React.FC = () => {
             onUpdateScore={updateMatchScore} 
             onReopenMatch={reopenMatch} 
             onUpdatePlayers={updateMatchPlayers} 
+            // Removed duplicate onUpdateScore
             onUpdateResting={updateRestingPlayer} 
             onUpdateSessionDate={updateSessionDate} 
             onArchive={(id) => setState(p => p ? ({ ...p, sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' } : x), currentTab: 'history' }) : null)} 
