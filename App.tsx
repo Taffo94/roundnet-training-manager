@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Player, MatchmakingMode, AppState, TrainingSession, Gender, Match, Round } from './types';
+import { Player, MatchmakingMode, AppState, TrainingSession, Gender, Match, Round, AuthMode } from './types';
 import { loadStateFromDB, saveStateToDB, isDBConfigured, getSupabaseConfig } from './services/storage';
 import { generateRound, calculateNewRatings } from './services/matchmaking';
 import PlayerList from './components/PlayerList';
@@ -34,6 +34,11 @@ const Logo = () => {
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState | null>(null);
+  const [auth, setAuth] = useState<AuthMode>(null);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [loginError, setLoginError] = useState('');
+  
   const [isSyncing, setIsSyncing] = useState(false);
   const [dbError, setDbError] = useState<{message: string, details?: string} | null>(null);
   const isInitialMount = useRef(true);
@@ -68,6 +73,16 @@ const App: React.FC = () => {
     });
     return map;
   }, [state?.sessions]);
+
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPassword === 'RMI_Training') {
+      setAuth('admin');
+      setLoginError('');
+    } else {
+      setLoginError('Password Errata');
+    }
+  };
 
   const updateSessionDate = (sessionId: string, newDate: number) => {
     setState(prev => {
@@ -280,6 +295,68 @@ const App: React.FC = () => {
 
   if (!state) return <div className="min-h-screen flex items-center justify-center font-black uppercase italic text-slate-400">RMI Manager Loading...</div>;
 
+  // LOGIN SCREEN
+  if (!auth) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center space-y-8 animate-in fade-in zoom-in duration-500">
+           <div className="flex justify-center"><Logo /></div>
+           <h1 className="text-3xl font-black uppercase italic tracking-tighter text-slate-800">Roundnet Milano <span className="text-red-600">Training</span></h1>
+           
+           {!showAdminLogin ? (
+             <div className="space-y-4">
+               <button 
+                 onClick={() => setAuth('user')} 
+                 className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 py-4 rounded-2xl font-black uppercase tracking-widest transition-all"
+               >
+                 Accedi come Atleta
+               </button>
+               <button 
+                 onClick={() => setShowAdminLogin(true)} 
+                 className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-red-200"
+               >
+                 Area Admin
+               </button>
+             </div>
+           ) : (
+             <form onSubmit={handleAdminLogin} className="space-y-4">
+               <div>
+                 <input 
+                   type="password" 
+                   placeholder="Password Admin" 
+                   value={adminPassword}
+                   onChange={(e) => setAdminPassword(e.target.value)}
+                   className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-center text-slate-800 focus:ring-4 focus:ring-red-600/10 focus:border-red-500 outline-none transition-all"
+                   autoFocus
+                 />
+                 {loginError && <p className="text-red-600 text-[10px] font-black uppercase mt-2">{loginError}</p>}
+               </div>
+               <div className="flex gap-3">
+                 <button 
+                   type="button" 
+                   onClick={() => { setShowAdminLogin(false); setAdminPassword(''); setLoginError(''); }}
+                   className="flex-1 bg-slate-100 text-slate-600 py-4 rounded-2xl font-black uppercase text-xs tracking-widest"
+                 >
+                   Indietro
+                 </button>
+                 <button 
+                   type="submit"
+                   className="flex-[2] bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl"
+                 >
+                   Accedi
+                 </button>
+               </div>
+             </form>
+           )}
+           <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">&copy; {new Date().getFullYear()} RMI Manager System</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isAdmin = auth === 'admin';
+  const tabs = isAdmin ? ['ranking', 'training', 'history', 'stats'] : ['ranking', 'history', 'stats'];
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-md">
@@ -288,24 +365,80 @@ const App: React.FC = () => {
             <Logo />
             <div>
               <h1 className="text-2xl font-black uppercase tracking-tighter italic leading-none text-slate-900">RMI <span className="text-red-600">TRAINING</span></h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1 mt-1">
-                {isSyncing ? <span className="w-2.5 h-2.5 bg-green-500 rounded-full sync-pulse shadow-sm shadow-green-200"></span> : <span className="w-2.5 h-2.5 bg-slate-300 rounded-full"></span>}
-                Cloud Sync attivo
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${isAdmin ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-slate-100 text-slate-500 border border-slate-200'} uppercase`}>
+                  {isAdmin ? 'Admin' : 'Atleta'}
+                </span>
+                <button onClick={() => setAuth(null)} className="text-[9px] font-black text-slate-400 hover:text-red-600 uppercase transition-colors">Logout</button>
+              </div>
             </div>
           </div>
           <nav className="flex bg-slate-100 p-1.5 rounded-2xl shadow-inner border border-slate-200">
-            {(['ranking', 'training', 'history', 'stats'] as const).map(tab => (
-              <button key={tab} onClick={() => setState(p => p ? ({ ...p, currentTab: tab }) : null)} className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${state.currentTab === tab ? 'bg-white text-red-600 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>{tab}</button>
+            {tabs.map(tab => (
+              <button 
+                key={tab} 
+                onClick={() => setState(p => p ? ({ ...p, currentTab: tab as any }) : null)} 
+                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${state.currentTab === tab ? 'bg-white text-red-600 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
+              >
+                {tab}
+              </button>
             ))}
           </nav>
         </div>
       </header>
       <main className="flex-1 container mx-auto px-4 py-8">
-        {state.currentTab === 'ranking' && <PlayerList players={state.players} onAddPlayer={(n, g, b) => setState(p => p ? ({ ...p, players: [...p.players, { id: Math.random().toString(36).substr(2, 9), name: n, gender: g, wins: 0, losses: 0, basePoints: b, matchPoints: 0, lastActive: Date.now() }] }) : null)} onUpdatePlayer={(id, n, g, b, m) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, name: n, gender: g, basePoints: b, matchPoints: m } : x) }) : null)} onDeletePlayer={(id) => window.confirm("Eliminare?") && setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null)} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} onResetPoints={resetAllPoints} onRecalculate={recalculateRanking} />}
-        {state.currentTab === 'training' && <ActiveTraining attendanceMap={attendanceMap} session={state.sessions.find(s => s.status === 'ACTIVE')} players={state.players} onStartSession={(ids, date) => setState(p => p ? ({ ...p, sessions: [{ id: Math.random().toString(36).substr(2, 9), date, participantIds: ids, rounds: [], status: 'ACTIVE' }, ...p.sessions], currentTab: 'training' }) : null)} onAddRound={(sid, mode) => setState(prev => { if (!prev) return null; const s = prev.sessions.find(x => x.id === sid); if (!s) return prev; return { ...prev, sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: [...x.rounds, generateRound(prev.players.filter(p => s.participantIds.includes(p.id)), mode, x.rounds.length + 1, x.rounds)] } : x) }; })} onDeleteRound={deleteRound} onUpdateScore={updateMatchScore} onReopenMatch={reopenMatch} onUpdatePlayers={updateMatchPlayers} onUpdateResting={updateRestingPlayer} onUpdateSessionDate={updateSessionDate} onArchive={(id) => setState(p => p ? ({ ...p, sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' } : x), currentTab: 'history' }) : null)} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} />}
-        {state.currentTab === 'history' && <TrainingHistory onUpdateSessionDate={updateSessionDate} sessions={state.sessions.filter(s => s.status === 'ARCHIVED')} players={state.players} onDeleteRound={deleteRound} onDeleteSession={deleteSession} onUpdateScore={updateMatchScore} onReopenMatch={reopenMatch} onUpdatePlayers={updateMatchPlayers} onUpdateResting={updateRestingPlayer} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} />}
-        {state.currentTab === 'stats' && <PlayerStats players={state.players} sessions={state.sessions} selectedPlayerId={state.selectedPlayerId} onSelectPlayer={(id) => setState(p => p ? ({ ...p, selectedPlayerId: id }) : null)} />}
+        {state.currentTab === 'ranking' && (
+          <PlayerList 
+            players={state.players} 
+            isAdmin={isAdmin}
+            onAddPlayer={(n, g, b) => setState(p => p ? ({ ...p, players: [...p.players, { id: Math.random().toString(36).substr(2, 9), name: n, gender: g, wins: 0, losses: 0, basePoints: b, matchPoints: 0, lastActive: Date.now() }] }) : null)} 
+            onUpdatePlayer={(id, n, g, b, m) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, name: n, gender: g, basePoints: b, matchPoints: m } : x) }) : null)} 
+            onDeletePlayer={(id) => window.confirm("Eliminare?") && setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null)} 
+            onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
+            onResetPoints={resetAllPoints} 
+            onRecalculate={recalculateRanking} 
+          />
+        )}
+        {isAdmin && state.currentTab === 'training' && (
+          <ActiveTraining 
+            attendanceMap={attendanceMap} 
+            session={state.sessions.find(s => s.status === 'ACTIVE')} 
+            players={state.players} 
+            onStartSession={(ids, date) => setState(p => p ? ({ ...p, sessions: [{ id: Math.random().toString(36).substr(2, 9), date, participantIds: ids, rounds: [], status: 'ACTIVE' }, ...p.sessions], currentTab: 'training' }) : null)} 
+            onAddRound={(sid, mode) => setState(prev => { if (!prev) return null; const s = prev.sessions.find(x => x.id === sid); if (!s) return prev; return { ...prev, sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: [...x.rounds, generateRound(prev.players.filter(p => s.participantIds.includes(p.id)), mode, x.rounds.length + 1, x.rounds)] } : x) }; })} 
+            onDeleteRound={deleteRound} 
+            onUpdateScore={updateMatchScore} 
+            onReopenMatch={reopenMatch} 
+            onUpdatePlayers={updateMatchPlayers} 
+            onUpdateResting={updateRestingPlayer} 
+            onUpdateSessionDate={updateSessionDate} 
+            onArchive={(id) => setState(p => p ? ({ ...p, sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' } : x), currentTab: 'history' }) : null)} 
+            onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
+          />
+        )}
+        {state.currentTab === 'history' && (
+          <TrainingHistory 
+            onUpdateSessionDate={updateSessionDate} 
+            sessions={state.sessions.filter(s => s.status === 'ARCHIVED')} 
+            players={state.players} 
+            isAdmin={isAdmin}
+            onDeleteRound={deleteRound} 
+            onDeleteSession={deleteSession} 
+            onUpdateScore={updateMatchScore} 
+            onReopenMatch={reopenMatch} 
+            onUpdatePlayers={updateMatchPlayers} 
+            onUpdateResting={updateRestingPlayer} 
+            onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
+          />
+        )}
+        {state.currentTab === 'stats' && (
+          <PlayerStats 
+            players={state.players} 
+            sessions={state.sessions} 
+            selectedPlayerId={state.selectedPlayerId} 
+            onSelectPlayer={(id) => setState(p => p ? ({ ...p, selectedPlayerId: id }) : null)} 
+          />
+        )}
       </main>
       <footer className="py-8 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest border-t border-slate-100 bg-white">&copy; {new Date().getFullYear()} Roundnet Milano</footer>
     </div>

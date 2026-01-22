@@ -1,5 +1,6 @@
 
 export type Gender = 'M' | 'F';
+export type AuthMode = 'admin' | 'user' | null;
 
 export interface Player {
   id: string;

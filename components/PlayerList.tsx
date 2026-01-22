@@ -4,6 +4,7 @@ import { Player, Gender } from '../types';
 
 interface PlayerListProps {
   players: Player[];
+  isAdmin: boolean;
   onAddPlayer: (name: string, gender: Gender, basePoints: number) => void;
   onUpdatePlayer: (id: string, name: string, gender: Gender, basePoints: number, matchPoints: number) => void;
   onDeletePlayer: (id: string) => void;
@@ -22,13 +23,14 @@ const InfoTooltip = ({ text, position = 'bottom' }: { text: string, position?: '
   </span>
 );
 
-const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdatePlayer, onDeletePlayer, onSelectPlayer, onResetPoints, onRecalculate }) => {
+const PlayerList: React.FC<PlayerListProps> = ({ players, isAdmin, onAddPlayer, onUpdatePlayer, onDeletePlayer, onSelectPlayer, onResetPoints, onRecalculate }) => {
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', gender: 'M' as Gender, basePoints: 0, matchPoints: 0 });
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) return;
     setError(null);
     const nameLower = formData.name.trim().toLowerCase();
     const exists = players.some(p => p.name.toLowerCase() === nameLower && p.id !== isEditing);
@@ -45,6 +47,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
   };
 
   const startEdit = (p: Player) => {
+    if (!isAdmin) return;
     setIsEditing(p.id);
     setError(null);
     setFormData({ name: p.name, gender: p.gender, basePoints: p.basePoints, matchPoints: p.matchPoints });
@@ -61,7 +64,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
           </h2>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Totale: {players.length} Atleti Registrati</p>
         </div>
-        {!isEditing && (
+        {isAdmin && !isEditing && (
           <div className="flex gap-3">
             <button 
               onClick={onRecalculate}
@@ -79,49 +82,51 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
         )}
       </div>
 
-      <div className="p-8 border-b border-slate-100 bg-white">
-        <form onSubmit={handleSubmit} className="flex flex-wrap gap-4 items-end">
-          <div className="flex-1 min-w-[220px]">
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Nome Atleta</label>
-            <input
-              type="text"
-              placeholder="Inserisci nome..."
-              value={formData.name}
-              onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
-              className={`w-full px-4 py-3 bg-slate-50 border rounded-2xl text-sm font-bold focus:outline-none focus:ring-4 transition-all ${error ? 'border-red-500 focus:ring-red-500/10' : 'border-slate-200 focus:ring-red-600/10 focus:border-red-600'}`}
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Sesso</label>
-            <select
-              value={formData.gender}
-              onChange={(e) => setFormData(p => ({ ...p, gender: e.target.value as Gender }))}
-              className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/10 transition-all"
-            >
-              <option value="M">M</option>
-              <option value="F">F</option>
-            </select>
-          </div>
-          <div className="w-28">
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Punti Base</label>
-            <input
-              type="number"
-              value={formData.basePoints}
-              onChange={(e) => setFormData(p => ({ ...p, basePoints: parseInt(e.target.value) || 0 }))}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/10 transition-all"
-            />
-          </div>
-          <div className="flex gap-2">
-            <button type="submit" className="bg-slate-900 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl">
-              {isEditing ? 'Salva' : 'Aggiungi'}
-            </button>
-            {isEditing && (
-              <button type="button" onClick={() => setIsEditing(null)} className="bg-slate-100 text-slate-500 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all">Annulla</button>
-            )}
-          </div>
-        </form>
-        {error && <p className="text-red-500 text-[10px] font-black uppercase mt-3 tracking-widest">{error}</p>}
-      </div>
+      {isAdmin && (
+        <div className="p-8 border-b border-slate-100 bg-white">
+          <form onSubmit={handleSubmit} className="flex flex-wrap gap-4 items-end">
+            <div className="flex-1 min-w-[220px]">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Nome Atleta</label>
+              <input
+                type="text"
+                placeholder="Inserisci nome..."
+                value={formData.name}
+                onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
+                className={`w-full px-4 py-3 bg-slate-50 border rounded-2xl text-sm font-bold focus:outline-none focus:ring-4 transition-all ${error ? 'border-red-500 focus:ring-red-500/10' : 'border-slate-200 focus:ring-red-600/10 focus:border-red-600'}`}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Sesso</label>
+              <select
+                value={formData.gender}
+                onChange={(e) => setFormData(p => ({ ...p, gender: e.target.value as Gender }))}
+                className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/10 transition-all"
+              >
+                <option value="M">M</option>
+                <option value="F">F</option>
+              </select>
+            </div>
+            <div className="w-28">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Punti Base</label>
+              <input
+                type="number"
+                value={formData.basePoints}
+                onChange={(e) => setFormData(p => ({ ...p, basePoints: parseInt(e.target.value) || 0 }))}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/10 transition-all"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" className="bg-slate-900 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl">
+                {isEditing ? 'Salva' : 'Aggiungi'}
+              </button>
+              {isEditing && (
+                <button type="button" onClick={() => setIsEditing(null)} className="bg-slate-100 text-slate-500 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all">Annulla</button>
+              )}
+            </div>
+          </form>
+          {error && <p className="text-red-500 text-[10px] font-black uppercase mt-3 tracking-widest">{error}</p>}
+        </div>
+      )}
 
       <div className="overflow-x-auto overflow-visible p-4">
         <table className="w-full text-left border-collapse overflow-visible">
@@ -130,10 +135,12 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
               <th className="px-6 py-4 rounded-tl-2xl tracking-widest">Rank</th>
               <th className="px-6 py-4 tracking-widest">Atleta</th>
               <th className="px-6 py-4 text-center tracking-widest">Sesso</th>
-              <th className="px-6 py-4 text-center tracking-widest">
-                Base
-                <InfoTooltip text="Punti assegnati manualmente in base al livello tecnico." position="bottom" />
-              </th>
+              {isAdmin && (
+                <th className="px-6 py-4 text-center tracking-widest">
+                  Base
+                  <InfoTooltip text="Punti assegnati manualmente in base al livello tecnico." position="bottom" />
+                </th>
+              )}
               <th className="px-6 py-4 text-center tracking-widest">
                 Match
                 <InfoTooltip text="Punti accumulati o persi tramite il sistema ELO (K=12)." position="bottom" />
@@ -143,7 +150,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
                 <InfoTooltip text="Punteggio finale che determina la posizione in classifica." position="bottom" />
               </th>
               <th className="px-6 py-4 text-center tracking-widest">V / S</th>
-              <th className="px-6 py-4 text-right rounded-tr-2xl tracking-widest">Azioni</th>
+              {isAdmin && <th className="px-6 py-4 text-right rounded-tr-2xl tracking-widest">Azioni</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -161,9 +168,11 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
                 <td className="px-6 py-5 text-center">
                   <span className={`text-[10px] font-black px-3 py-1.5 rounded-full ${player.gender === 'M' ? 'bg-blue-50 text-blue-600' : 'bg-pink-50 text-pink-600'}`}>{player.gender}</span>
                 </td>
-                <td className="px-6 py-5 text-center font-bold text-slate-500">
-                  {Math.round(player.basePoints)}
-                </td>
+                {isAdmin && (
+                  <td className="px-6 py-5 text-center font-bold text-slate-500">
+                    {Math.round(player.basePoints)}
+                  </td>
+                )}
                 <td className="px-6 py-5 text-center font-bold text-slate-500">
                   {Math.round(player.matchPoints) > 0 ? `+${Math.round(player.matchPoints)}` : Math.round(player.matchPoints)}
                 </td>
@@ -173,12 +182,14 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, onAddPlayer, onUpdateP
                 <td className="px-6 py-5 text-center text-xs font-black text-slate-400">
                   <span className="text-green-500">{player.wins}</span> / <span className="text-red-400">{player.losses}</span>
                 </td>
-                <td className="px-6 py-5 text-right">
-                  <div className="flex gap-4 justify-end">
-                    <button onClick={() => startEdit(player)} className="text-slate-300 hover:text-blue-600 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                    <button onClick={() => onDeletePlayer(player.id)} className="text-slate-300 hover:text-red-600 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                  </div>
-                </td>
+                {isAdmin && (
+                  <td className="px-6 py-5 text-right">
+                    <div className="flex gap-4 justify-end">
+                      <button onClick={() => startEdit(player)} className="text-slate-300 hover:text-blue-600 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
+                      <button onClick={() => onDeletePlayer(player.id)} className="text-slate-300 hover:text-red-600 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
