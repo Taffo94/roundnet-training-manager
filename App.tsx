@@ -13,7 +13,7 @@ const AUTH_STORAGE_KEY = 'rmi_auth_session';
 const Logo = () => {
   const [error, setError] = useState(false);
 
-  const logoSrc = `${import.meta.env.BASE_URL}logo2.jpeg`;
+  const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
 
   console.log('[Logo] render');
   console.log('[Logo] BASE_URL:', import.meta.env.BASE_URL);
