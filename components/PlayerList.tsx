@@ -136,15 +136,17 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, isAdmin, onAddPlayer, 
               <th className="px-6 py-4 tracking-widest">Atleta</th>
               <th className="px-6 py-4 text-center tracking-widest">Sesso</th>
               {isAdmin && (
-                <th className="px-6 py-4 text-center tracking-widest">
-                  Base
-                  <InfoTooltip text="Punti assegnati manualmente in base al livello tecnico." position="bottom" />
-                </th>
+                <>
+                  <th className="px-6 py-4 text-center tracking-widest">
+                    Base
+                    <InfoTooltip text="Punti assegnati manualmente in base al livello tecnico." position="bottom" />
+                  </th>
+                  <th className="px-6 py-4 text-center tracking-widest">
+                    Match
+                    <InfoTooltip text="Punti accumulati o persi tramite il sistema ELO (K=12)." position="bottom" />
+                  </th>
+                </>
               )}
-              <th className="px-6 py-4 text-center tracking-widest">
-                Match
-                <InfoTooltip text="Punti accumulati o persi tramite il sistema ELO (K=12)." position="bottom" />
-              </th>
               <th className="px-6 py-4 text-center text-red-600 font-black italic tracking-widest">
                 Totale
                 <InfoTooltip text="Punteggio finale che determina la posizione in classifica." position="bottom" />
@@ -169,13 +171,15 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, isAdmin, onAddPlayer, 
                   <span className={`text-[10px] font-black px-3 py-1.5 rounded-full ${player.gender === 'M' ? 'bg-blue-50 text-blue-600' : 'bg-pink-50 text-pink-600'}`}>{player.gender}</span>
                 </td>
                 {isAdmin && (
-                  <td className="px-6 py-5 text-center font-bold text-slate-500">
-                    {Math.round(player.basePoints)}
-                  </td>
+                  <>
+                    <td className="px-6 py-5 text-center font-bold text-slate-500">
+                      {Math.round(player.basePoints)}
+                    </td>
+                    <td className="px-6 py-5 text-center font-bold text-slate-500">
+                      {Math.round(player.matchPoints) > 0 ? `+${Math.round(player.matchPoints)}` : Math.round(player.matchPoints)}
+                    </td>
+                  </>
                 )}
-                <td className="px-6 py-5 text-center font-bold text-slate-500">
-                  {Math.round(player.matchPoints) > 0 ? `+${Math.round(player.matchPoints)}` : Math.round(player.matchPoints)}
-                </td>
                 <td className="px-6 py-5 text-center">
                   <span className="bg-red-50 text-red-700 px-4 py-1.5 rounded-full text-sm font-black italic shadow-sm">{Math.round(player.basePoints + player.matchPoints)}</span>
                 </td>
