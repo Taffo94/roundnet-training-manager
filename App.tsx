@@ -18,7 +18,7 @@ const Logo = () => {
       <div className="bg-white p-1 rounded-full shadow-md border border-slate-100 w-14 h-14 flex items-center justify-center overflow-hidden">
         {!error ? (
           <img 
-            src='/logo.png' 
+            src={`${import.meta.env.BASE_URL}logo.png`} 
             alt="Roundnet Milano" 
             className="w-full h-full object-contain" 
             onError={() => setError(true)}
