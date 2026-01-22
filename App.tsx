@@ -13,12 +13,8 @@ const AUTH_STORAGE_KEY = 'rmi_auth_session';
 const Logo = () => {
   const [error, setError] = useState(false);
 
-  const logoSrc = `${import.meta.env.BASE_URL}Italien_Milano.png`;
-
-  console.log('[Logo] render');
-  console.log('[Logo] BASE_URL:', import.meta.env.BASE_URL);
-  console.log('[Logo] logoSrc:', logoSrc);
-  console.log('[Logo] error state:', error);
+  // cache-buster per forzare ricarica
+  const logoSrc = `/Italien_Milano2.png?v=${Date.now()}`;
 
   return (
     <div className="relative">
@@ -28,12 +24,9 @@ const Logo = () => {
             src={logoSrc}
             alt="Roundnet Milano"
             className="w-full h-full object-contain"
-            onLoad={() => {
-              console.log('[Logo] image loaded correctly:', logoSrc);
-            }}
+            onLoad={() => console.log("[Logo] image loaded correctly")}
             onError={(e) => {
-              console.error('[Logo] image FAILED to load:', logoSrc);
-              console.error('[Logo] onError event:', e);
+              console.error("[Logo] image FAILED to load", e);
               setError(true);
             }}
           />
