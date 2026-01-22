@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { TrainingSession, Player, MatchmakingMode, Round } from '../types';
 
 interface TrainingHistoryProps {
@@ -20,6 +20,8 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
   sessions, players, isAdmin, onDeleteRound, onDeleteSession, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onUpdateSessionDate, onSelectPlayer 
 }) => {
   const [matchScores, setMatchScores] = useState<Record<string, { s1: string, s2: string }>>({});
+  const dateInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
   const getPlayer = (id: string) => players.find(p => p.id === id);
 
   const getTeamPoints = (ids: string[]) => {
@@ -45,6 +47,21 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
       });
     });
     return new Set(Object.keys(counts).filter(id => counts[id] > 1));
+  };
+
+  const handleOpenDatePicker = (sessionId: string) => {
+    const input = dateInputRefs.current[sessionId];
+    if (input) {
+      if ('showPicker' in HTMLInputElement.prototype) {
+        try {
+          input.showPicker();
+        } catch (e) {
+          input.click();
+        }
+      } else {
+        input.click();
+      }
+    }
   };
 
   return (
@@ -80,12 +97,17 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                 </div>
                 {isAdmin && (
                   <div className="relative">
-                    <button className="bg-slate-50 border border-slate-200 px-6 py-2.5 rounded-xl text-[10px] font-black text-red-600 hover:bg-red-50 transition-all uppercase tracking-widest shadow-sm">
+                    <button 
+                      onClick={() => handleOpenDatePicker(session.id)}
+                      className="bg-slate-50 border border-slate-200 px-6 py-2.5 rounded-xl text-[10px] font-black text-red-600 hover:bg-red-50 transition-all uppercase tracking-widest shadow-sm"
+                    >
                       ✏️ Modifica Data
                     </button>
                     <input 
                       type="date" 
-                      className="absolute inset-0 opacity-0 cursor-pointer" 
+                      // Fix: Wrapped assignment in a block to ensure ref callback returns void
+                      ref={el => { dateInputRefs.current[session.id] = el; }}
+                      className="absolute inset-0 w-0 h-0 opacity-0 pointer-events-none" 
                       onChange={(e) => {
                         if(e.target.value) onUpdateSessionDate(session.id, new Date(e.target.value).getTime());
                       }}

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Player, TrainingSession, MatchmakingMode, Round } from '../types';
 
 interface ActiveTrainingProps {
@@ -33,6 +33,8 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [matchScores, setMatchScores] = useState<Record<string, { s1: string, s2: string }>>({});
   const [sessionDate, setSessionDate] = useState<string>(getNextMonday());
+  
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const togglePlayer = (id: string) => setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   const getPlayer = (id: string) => players.find(p => p.id === id);
@@ -70,6 +72,20 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
       });
     });
     return new Set(Object.keys(counts).filter(id => counts[id] > 1));
+  };
+
+  const handleOpenDatePicker = () => {
+    if (dateInputRef.current) {
+      if ('showPicker' in HTMLInputElement.prototype) {
+        try {
+          dateInputRef.current.showPicker();
+        } catch (e) {
+          dateInputRef.current.click();
+        }
+      } else {
+        dateInputRef.current.click();
+      }
+    }
   };
 
   if (!session) {
@@ -119,12 +135,16 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
           <div className="flex items-center gap-3">
             <p className="text-[11px] font-black text-red-600 uppercase tracking-[0.2em]">{new Date(session.date).toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long' })}</p>
             <div className="relative">
-              <button className="text-[10px] font-black uppercase text-slate-300 hover:text-red-500 flex items-center gap-1 transition-colors">
+              <button 
+                onClick={handleOpenDatePicker}
+                className="text-[10px] font-black uppercase text-slate-300 hover:text-red-500 flex items-center gap-1 transition-colors"
+              >
                  ✏️ Modifica Data
               </button>
               <input 
                 type="date" 
-                className="absolute inset-0 opacity-0 cursor-pointer" 
+                ref={dateInputRef}
+                className="absolute inset-0 w-0 h-0 opacity-0 pointer-events-none" 
                 onChange={(e) => {
                   if(e.target.value) onUpdateSessionDate(session.id, new Date(e.target.value).getTime());
                 }}

@@ -8,40 +8,32 @@ import ActiveTraining from './components/ActiveTraining';
 import TrainingHistory from './components/TrainingHistory';
 import PlayerStats from './components/PlayerStats';
 
+import logoImg from './Italien_Milano.png';
+
 const AUTH_STORAGE_KEY = 'rmi_auth_session';
 
 const Logo = () => {
   const [error, setError] = useState(false);
-
-  const logoSrc = `${import.meta.env.BASE_URL}Italien_Milano.png`;
-
-  console.log('[Logo] render');
-  console.log('[Logo] BASE_URL:', import.meta.env.BASE_URL);
-  console.log('[Logo] logoSrc:', logoSrc);
-  console.log('[Logo] error state:', error);
-
   return (
-    <div className="relative">
-      <div className="bg-white p-1 rounded-full shadow-md border border-slate-100 w-14 h-14 flex items-center justify-center overflow-hidden">
+    <div className="relative group">
+      <div className="bg-white p-1 rounded-2xl shadow-lg shadow-slate-200 w-14 h-14 flex items-center justify-center overflow-hidden transform group-hover:scale-110 transition-transform duration-300 border border-slate-100">
         {!error ? (
-          <img
-            src={logoSrc}
-            alt="Roundnet Milano"
-            className="w-full h-full object-contain"
-            onLoad={() => {
-              console.log('[Logo] image loaded correctly:', logoSrc);
-            }}
-            onError={(e) => {
-              console.error('[Logo] image FAILED to load:', logoSrc);
-              console.error('[Logo] onError event:', e);
-              setError(true);
-            }}
+          <img 
+            src={logoImg} 
+            alt="Roundnet Milano" 
+            className="w-full h-full object-contain" 
+            onError={() => setError(true)}
           />
         ) : (
           <div className="bg-red-600 w-full h-full flex items-center justify-center text-white font-black italic text-xs">
-            RM
+            RMI
           </div>
         )}
+      </div>
+      <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm border border-slate-100">
+        <div className="w-4 h-4 bg-slate-900 rounded-full flex items-center justify-center">
+          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
+        </div>
       </div>
     </div>
   );
