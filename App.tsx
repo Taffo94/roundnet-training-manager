@@ -8,41 +8,22 @@ import ActiveTraining from './components/ActiveTraining';
 import TrainingHistory from './components/TrainingHistory';
 import PlayerStats from './components/PlayerStats';
 
-
 const AUTH_STORAGE_KEY = 'rmi_auth_session';
 
 const Logo = () => {
-  const [error, setError] = useState(false);
-
-  const logoSrc = `${import.meta.env.BASE_URL}logo2.png`;
-
-  console.log('[Logo] render');
-  console.log('[Logo] BASE_URL:', import.meta.env.BASE_URL);
-  console.log('[Logo] logoSrc:', logoSrc);
-  console.log('[Logo] error state:', error);
-
   return (
-    <div className="relative">
-      <div className="bg-white p-1 rounded-full shadow-md border border-slate-100 w-14 h-14 flex items-center justify-center overflow-hidden">
-        {!error ? (
-          <img
-            src={logoSrc}
-            alt="Roundnet Milano"
-            className="w-full h-full object-contain"
-            onLoad={() => {
-              console.log('[Logo] image loaded correctly:', logoSrc);
-            }}
-            onError={(e) => {
-              console.error('[Logo] image FAILED to load:', logoSrc);
-              console.error('[Logo] onError event:', e);
-              setError(true);
-            }}
-          />
-        ) : (
-          <div className="bg-red-600 w-full h-full flex items-center justify-center text-white font-black italic text-xs">
-            RM
-          </div>
-        )}
+    <div className="relative group">
+      <div className="bg-red-600 p-2.5 rounded-2xl shadow-lg shadow-red-200 w-14 h-14 flex items-center justify-center transform group-hover:rotate-12 transition-transform duration-300">
+        <svg viewBox="0 0 100 100" className="w-full h-full fill-none stroke-white" strokeWidth="8">
+          <circle cx="50" cy="50" r="40" strokeDasharray="10 5" />
+          <path d="M30 50 L70 50 M50 30 L50 70" strokeLinecap="round" />
+          <text x="50" y="55" textAnchor="middle" className="fill-white font-black italic text-[24px]" stroke="none">RM</text>
+        </svg>
+      </div>
+      <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm border border-slate-100">
+        <div className="w-4 h-4 bg-slate-900 rounded-full flex items-center justify-center">
+          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
+        </div>
       </div>
     </div>
   );
@@ -51,7 +32,6 @@ const Logo = () => {
 const App: React.FC = () => {
   const [state, setState] = useState<AppState | null>(null);
   
-  // Inizializza l'auth dal localStorage se presente
   const [auth, setAuth] = useState<AuthMode>(() => {
     const savedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
     return (savedAuth as AuthMode) || null;
@@ -65,7 +45,6 @@ const App: React.FC = () => {
   const [dbError, setDbError] = useState<{message: string, details?: string} | null>(null);
   const isInitialMount = useRef(true);
 
-  // Effetto per persistere l'auth quando cambia
   useEffect(() => {
     if (auth) {
       localStorage.setItem(AUTH_STORAGE_KEY, auth);
@@ -330,15 +309,34 @@ const App: React.FC = () => {
     }
   };
 
-  if (!state) return <div className="min-h-screen flex items-center justify-center font-black uppercase italic text-slate-400">RMI Manager Loading...</div>;
+  if (dbError) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full border border-red-100">
+          <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center text-3xl mb-6 mx-auto">⚠️</div>
+          <h2 className="text-2xl font-black text-center text-slate-800 uppercase italic tracking-tight mb-4">{dbError.message}</h2>
+          <p className="text-slate-500 text-sm text-center mb-6">{dbError.details}</p>
+          <button onClick={() => window.location.reload()} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-black transition-all">Ricarica Pagina</button>
+        </div>
+      </div>
+    );
+  }
 
-  // LOGIN SCREEN
+  if (!state) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="font-black uppercase italic text-slate-400 text-sm tracking-widest animate-pulse">Inizializzazione Sistema...</p>
+      </div>
+    </div>
+  );
+
   if (!auth) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center space-y-8 animate-in fade-in zoom-in duration-500">
            <div className="flex justify-center"><Logo /></div>
-           <h1 className="text-3xl font-black uppercase italic tracking-tighter text-slate-800">Roundnet Milano <span className="text-red-600">Training</span></h1>
+           <h1 className="text-3xl font-black uppercase italic tracking-tighter text-slate-800">Roundnet Milano <span className="rm-gradient-text italic">Training</span></h1>
            
            {!showAdminLogin ? (
              <div className="space-y-4">
@@ -346,7 +344,7 @@ const App: React.FC = () => {
                  onClick={() => setAuth('user')} 
                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 py-4 rounded-2xl font-black uppercase tracking-widest transition-all"
                >
-                 Accedi come Atleta
+                 Accesso Atleta
                </button>
                <button 
                  onClick={() => setShowAdminLogin(true)} 
@@ -360,7 +358,7 @@ const App: React.FC = () => {
                <div>
                  <input 
                    type="password" 
-                   placeholder="Password Admin" 
+                   placeholder="Inserisci Password" 
                    value={adminPassword}
                    onChange={(e) => setAdminPassword(e.target.value)}
                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-center text-slate-800 focus:ring-4 focus:ring-red-600/10 focus:border-red-500 outline-none transition-all"
@@ -380,12 +378,12 @@ const App: React.FC = () => {
                    type="submit"
                    className="flex-[2] bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl"
                  >
-                   Accedi
+                   Entra
                  </button>
                </div>
              </form>
            )}
-           <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">&copy; {new Date().getFullYear()} RMI Manager System</p>
+           <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">&copy; {new Date().getFullYear()} RMI Training Manager</p>
         </div>
       </div>
     );
@@ -401,21 +399,21 @@ const App: React.FC = () => {
           <div className="flex items-center gap-4">
             <Logo />
             <div>
-              <h1 className="text-2xl font-black uppercase tracking-tighter italic leading-none text-slate-900">RMI <span className="text-red-600">TRAINING</span></h1>
+              <h1 className="text-2xl font-black uppercase tracking-tighter italic leading-none text-slate-900">RMI <span className="text-red-600">MANAGER</span></h1>
               <div className="flex items-center gap-2 mt-1">
                 <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${isAdmin ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-slate-100 text-slate-500 border border-slate-200'} uppercase`}>
-                  {isAdmin ? 'Admin' : 'Atleta'}
+                  {isAdmin ? 'Amministratore' : 'Utente'}
                 </span>
-                <button onClick={handleLogout} className="text-[9px] font-black text-slate-400 hover:text-red-600 uppercase transition-colors">Logout</button>
+                <button onClick={handleLogout} className="text-[9px] font-black text-slate-400 hover:text-red-600 uppercase transition-colors ml-1">Esci</button>
               </div>
             </div>
           </div>
-          <nav className="flex bg-slate-100 p-1.5 rounded-2xl shadow-inner border border-slate-200">
+          <nav className="flex bg-slate-100 p-1 rounded-2xl shadow-inner border border-slate-200">
             {tabs.map(tab => (
               <button 
                 key={tab} 
                 onClick={() => setState(p => p ? ({ ...p, currentTab: tab as any }) : null)} 
-                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${state.currentTab === tab ? 'bg-white text-red-600 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${state.currentTab === tab ? 'bg-white text-red-600 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
               >
                 {tab}
               </button>
@@ -423,14 +421,22 @@ const App: React.FC = () => {
           </nav>
         </div>
       </header>
-      <main className="flex-1 container mx-auto px-4 py-8">
+
+      <main className="flex-1 container mx-auto px-4 py-8 relative">
+        {isSyncing && (
+          <div className="fixed bottom-4 right-4 bg-white/90 backdrop-blur border border-slate-200 px-4 py-2 rounded-full shadow-lg flex items-center gap-2 z-[100] animate-in fade-in slide-in-from-bottom-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Sincronizzazione...</span>
+          </div>
+        )}
+
         {state.currentTab === 'ranking' && (
           <PlayerList 
             players={state.players} 
             isAdmin={isAdmin}
             onAddPlayer={(n, g, b) => setState(p => p ? ({ ...p, players: [...p.players, { id: Math.random().toString(36).substr(2, 9), name: n, gender: g, wins: 0, losses: 0, basePoints: b, matchPoints: 0, lastActive: Date.now() }] }) : null)} 
             onUpdatePlayer={(id, n, g, b, m) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, name: n, gender: g, basePoints: b, matchPoints: m } : x) }) : null)} 
-            onDeletePlayer={(id) => window.confirm("Eliminare?") && setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null)} 
+            onDeletePlayer={(id) => window.confirm("Eliminare definitivamente?") && setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null)} 
             onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
             onResetPoints={resetAllPoints} 
             onRecalculate={recalculateRanking} 
@@ -447,7 +453,6 @@ const App: React.FC = () => {
             onUpdateScore={updateMatchScore} 
             onReopenMatch={reopenMatch} 
             onUpdatePlayers={updateMatchPlayers} 
-            // Removed duplicate onUpdateScore
             onUpdateResting={updateRestingPlayer} 
             onUpdateSessionDate={updateSessionDate} 
             onArchive={(id) => setState(p => p ? ({ ...p, sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' } : x), currentTab: 'history' }) : null)} 
@@ -478,7 +483,8 @@ const App: React.FC = () => {
           />
         )}
       </main>
-      <footer className="py-8 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest border-t border-slate-100 bg-white">&copy; {new Date().getFullYear()} Roundnet Milano</footer>
+
+      <footer className="py-8 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest border-t border-slate-100 bg-white">&copy; {new Date().getFullYear()} Roundnet Milano Official Manager</footer>
     </div>
   );
 };
