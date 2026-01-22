@@ -64,6 +64,49 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
     }
   };
 
+  const exportToExcel = (session: TrainingSession) => {
+    const rows: string[][] = [];
+    
+    // Header Info
+    rows.push(['Roundnet Milano - Report Allenamento']);
+    rows.push(['Data', new Date(session.date).toLocaleDateString()]);
+    rows.push(['Partecipanti', session.participantIds.length.toString()]);
+    rows.push([]);
+    
+    // Matches Data
+    rows.push(['Round', 'Team 1 (Giocatori)', 'Team 2 (Giocatori)', 'Punteggio', 'Modalità', 'Delta Punti']);
+    
+    session.rounds.forEach(round => {
+      round.matches.forEach(match => {
+        const p1 = getPlayer(match.team1.playerIds[0])?.name || '---';
+        const p2 = getPlayer(match.team1.playerIds[1])?.name || '---';
+        const p3 = getPlayer(match.team2.playerIds[0])?.name || '---';
+        const p4 = getPlayer(match.team2.playerIds[1])?.name || '---';
+        
+        rows.push([
+          `Round ${round.roundNumber}`,
+          `${p1} / ${p2}`,
+          `${p3} / ${p4}`,
+          match.status === 'COMPLETED' ? `${match.team1.score} - ${match.team2.score}` : 'In corso',
+          round.mode,
+          match.pointsDelta ? match.pointsDelta.toString() : '0'
+        ]);
+      });
+    });
+
+    // Create CSV content
+    const csvContent = rows.map(r => r.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Allenamento_RMI_${new Date(session.date).toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       <div className="flex items-center gap-4 mb-10">
@@ -76,8 +119,8 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
           <details key={session.id} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden group">
             <summary className="p-6 flex justify-between items-center cursor-pointer hover:bg-slate-50 list-none transition-all">
               <div className="flex items-center gap-6">
-                <div className="bg-red-600 text-white font-black p-4 px-5 rounded-2xl text-[11px] uppercase tracking-widest shadow-lg shadow-red-100 italic">
-                  {new Date(session.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                <div className="bg-red-600 text-white font-black p-4 px-5 rounded-2xl text-[11px] uppercase tracking-widest shadow-lg shadow-red-100 italic text-center min-w-[100px]">
+                  {new Date(session.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
                 </div>
                 <div>
                   <div className="font-black text-slate-800 uppercase italic tracking-tight">{session.participantIds.length} Atleti presenti</div>
@@ -85,7 +128,16 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                 {isAdmin && <button onClick={(e) => { e.preventDefault(); onDeleteSession(session.id); }} className="text-slate-300 hover:text-red-600 p-2 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
+                 <button 
+                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); exportToExcel(session); }} 
+                   className="text-slate-400 hover:text-green-600 p-2 transition-all transform hover:scale-110"
+                   title="Scarica Excel (CSV)"
+                 >
+                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                   </svg>
+                 </button>
+                 {isAdmin && <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDeleteSession(session.id); }} className="text-slate-300 hover:text-red-600 p-2 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-300 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </div>
             </summary>
@@ -105,7 +157,6 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                     </button>
                     <input 
                       type="date" 
-                      // Fix: Wrapped assignment in a block to ensure ref callback returns void
                       ref={el => { dateInputRefs.current[session.id] = el; }}
                       className="absolute inset-0 w-0 h-0 opacity-0 pointer-events-none" 
                       onChange={(e) => {

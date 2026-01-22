@@ -121,6 +121,16 @@ const App: React.FC = () => {
     });
   };
 
+  const updateSessionParticipants = (sessionId: string, newParticipantIds: string[]) => {
+    setState(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        sessions: prev.sessions.map(s => s.id === sessionId ? { ...s, participantIds: newParticipantIds } : s)
+      };
+    });
+  };
+
   const revertPlayerPoints = (players: Player[], match: Match): Player[] => {
     if (match.status !== 'COMPLETED' || !match.individualDeltas) return players;
     const win1 = (match.team1.score || 0) > (match.team2.score || 0) ? 1 : 0;
@@ -403,6 +413,8 @@ const App: React.FC = () => {
   const isAdmin = auth === 'admin';
   const tabs = isAdmin ? ['ranking', 'training', 'history', 'stats'] : ['ranking', 'history', 'stats'];
 
+  const activeSession = state.sessions.find(s => s.status === 'ACTIVE');
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-md">
@@ -456,7 +468,7 @@ const App: React.FC = () => {
         {isAdmin && state.currentTab === 'training' && (
           <ActiveTraining 
             attendanceMap={attendanceMap} 
-            session={state.sessions.find(s => s.status === 'ACTIVE')} 
+            session={activeSession} 
             players={state.players} 
             onStartSession={(ids, date) => setState(p => p ? ({ ...p, sessions: [{ id: Math.random().toString(36).substr(2, 9), date, participantIds: ids, rounds: [], status: 'ACTIVE' }, ...p.sessions], currentTab: 'training' }) : null)} 
             onAddRound={(sid, mode) => setState(prev => { if (!prev) return null; const s = prev.sessions.find(x => x.id === sid); if (!s) return prev; return { ...prev, sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: [...x.rounds, generateRound(prev.players.filter(p => s.participantIds.includes(p.id)), mode, x.rounds.length + 1, x.rounds)] } : x) }; })} 
@@ -466,6 +478,7 @@ const App: React.FC = () => {
             onUpdatePlayers={updateMatchPlayers} 
             onUpdateResting={updateRestingPlayer} 
             onUpdateSessionDate={updateSessionDate} 
+            onEditParticipants={(ids) => activeSession && updateSessionParticipants(activeSession.id, ids)}
             onArchive={(id) => setState(p => p ? ({ ...p, sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' } : x), currentTab: 'history' }) : null)} 
             onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
           />

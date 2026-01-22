@@ -16,6 +16,7 @@ interface ActiveTrainingProps {
   onUpdateSessionDate: (sid: string, newDate: number) => void;
   onArchive: (sessionId: string) => void;
   onSelectPlayer: (id: string) => void;
+  onEditParticipants?: (ids: string[]) => void;
 }
 
 const getNextMonday = () => {
@@ -28,11 +29,12 @@ const getNextMonday = () => {
 };
 
 const ActiveTraining: React.FC<ActiveTrainingProps> = ({ 
-  session, players, attendanceMap, onStartSession, onAddRound, onDeleteRound, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onUpdateSessionDate, onArchive, onSelectPlayer 
+  session, players, attendanceMap, onStartSession, onAddRound, onDeleteRound, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onUpdateSessionDate, onArchive, onSelectPlayer, onEditParticipants
 }) => {
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>(session?.participantIds || []);
   const [matchScores, setMatchScores] = useState<Record<string, { s1: string, s2: string }>>({});
   const [sessionDate, setSessionDate] = useState<string>(getNextMonday());
+  const [isEditingParticipants, setIsEditingParticipants] = useState(false);
   
   const dateInputRef = useRef<HTMLInputElement>(null);
 
@@ -88,23 +90,27 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
     }
   };
 
-  if (!session) {
+  if (!session || isEditingParticipants) {
     return (
       <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-2xl border border-slate-100 p-10 space-y-10">
         <div className="text-center">
-          <h2 className="text-4xl font-black text-slate-800 uppercase italic tracking-tighter leading-tight">Nuovo Allenamento</h2>
+          <h2 className="text-4xl font-black text-slate-800 uppercase italic tracking-tighter leading-tight">
+            {isEditingParticipants ? 'Modifica Partecipanti' : 'Nuovo Allenamento'}
+          </h2>
           <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-2">Gli atleti sono ordinati per frequenza di presenza</p>
         </div>
         
-        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 px-1">Seleziona Data</label>
-          <input 
-            type="date" 
-            value={sessionDate} 
-            onChange={(e) => setSessionDate(e.target.value)} 
-            className="w-full p-4 bg-white border border-slate-200 rounded-xl font-black text-slate-800 outline-none focus:ring-4 focus:ring-red-600/10 focus:border-red-500 transition-all" 
-          />
-        </div>
+        {!isEditingParticipants && (
+          <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 px-1">Seleziona Data</label>
+            <input 
+              type="date" 
+              value={sessionDate} 
+              onChange={(e) => setSessionDate(e.target.value)} 
+              className="w-full p-4 bg-white border border-slate-200 rounded-xl font-black text-slate-800 outline-none focus:ring-4 focus:ring-red-600/10 focus:border-red-500 transition-all" 
+            />
+          </div>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {sortedByAttendance.map(p => {
@@ -121,7 +127,28 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
           })}
         </div>
         <div className="flex flex-col items-center gap-4">
-          <button onClick={() => onStartSession(selectedIds, new Date(sessionDate).getTime())} disabled={selectedIds.length < 4} className="bg-slate-900 text-white px-16 py-5 rounded-2xl font-black uppercase tracking-widest disabled:opacity-30 shadow-2xl hover:bg-black transition-all transform hover:-translate-y-1 active:translate-y-0">Inizia Allenamento ({selectedIds.length})</button>
+          {isEditingParticipants ? (
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setIsEditingParticipants(false)} 
+                className="bg-slate-100 text-slate-500 px-8 py-4 rounded-2xl font-black uppercase tracking-widest"
+              >
+                Annulla
+              </button>
+              <button 
+                onClick={() => {
+                  if (onEditParticipants) onEditParticipants(selectedIds);
+                  setIsEditingParticipants(false);
+                }} 
+                disabled={selectedIds.length < 4} 
+                className="bg-red-600 text-white px-12 py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl disabled:opacity-30"
+              >
+                Salva Modifiche ({selectedIds.length})
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => onStartSession(selectedIds, new Date(sessionDate).getTime())} disabled={selectedIds.length < 4} className="bg-slate-900 text-white px-16 py-5 rounded-2xl font-black uppercase tracking-widest disabled:opacity-30 shadow-2xl hover:bg-black transition-all transform hover:-translate-y-1 active:translate-y-0">Inizia Allenamento ({selectedIds.length})</button>
+          )}
         </div>
       </div>
     );
@@ -139,7 +166,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                 onClick={handleOpenDatePicker}
                 className="text-[10px] font-black uppercase text-slate-300 hover:text-red-500 flex items-center gap-1 transition-colors"
               >
-                 ✏️ Modifica Data
+                 ✏️ Data
               </button>
               <input 
                 type="date" 
@@ -150,6 +177,15 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                 }}
               />
             </div>
+            <button 
+              onClick={() => {
+                setSelectedIds(session.participantIds);
+                setIsEditingParticipants(true);
+              }} 
+              className="text-[10px] font-black uppercase text-slate-300 hover:text-blue-500 flex items-center gap-1 transition-colors ml-2"
+            >
+              👥 Partecipanti
+            </button>
           </div>
         </div>
         <button onClick={() => onArchive(session.id)} className="bg-slate-900 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase shadow-lg hover:bg-black transition-all">Archivia Sessione</button>
