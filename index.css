@@ -24,8 +24,17 @@ body {
     font-size: 10pt;
   }
   
-  header, footer, nav, button, summary, .print\:hidden {
+  header, footer, nav, summary, .print\:hidden {
     display: none !important;
+  }
+
+  /* Non nascondiamo tutti i button per permettere ai renderer di catturare il testo */
+  button {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    color: inherit !important;
   }
 
   details {
@@ -54,14 +63,6 @@ body {
   .p-8 { padding: 0.5rem !important; }
   .p-6 { padding: 0.25rem !important; }
   .space-y-10 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.5rem !important; }
-  .space-y-8 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.5rem !important; }
-  .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.25rem !important; }
-  .gap-8 { gap: 0.5rem !important; }
-  .gap-10 { gap: 1rem !important; }
-
-  /* Arrotondamenti e ombre inutili in stampa */
-  .rounded-3xl { rounded: 0.5rem !important; }
-  .shadow-sm, .shadow-md, .shadow-xl { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
 
   /* Assicura che i colori siano mantenuti */
   * {
