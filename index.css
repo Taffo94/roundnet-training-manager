@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,26 +6,46 @@
 body {
   @apply bg-slate-50 text-slate-900;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Scrollbar personalizzata per un look più moderno */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  @apply bg-transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 rounded-full border-4 border-transparent bg-clip-padding;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400;
 }
 
 .rm-gradient-text {
   @apply bg-clip-text text-transparent bg-gradient-to-r from-red-600 to-red-500;
+}
+
+/* Stili per la stampa PDF */
+@media print {
+  body {
+    background: white !important;
+  }
+  
+  header, footer, nav, button, summary, .print\:hidden {
+    display: none !important;
+  }
+
+  details {
+    display: block !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  details > div {
+    display: block !important;
+    padding: 0 !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .print\:break-after-page {
+    page-break-after: always;
+  }
+
+  /* Assicura che i colori siano mantenuti */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 }
