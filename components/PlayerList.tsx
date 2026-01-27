@@ -70,7 +70,7 @@ const PlayerList: React.FC<PlayerListProps> = ({ players, deltas, isAdmin, onAdd
                       <span className="font-bold text-slate-600">{Math.round(player.matchPoints)}</span>
                       {d && d.points !== 0 && (
                         <span className={`text-[9px] font-black italic ${d.points > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                          {d.points > 0 ? '+' : ''}{d.points.toFixed(1)} last
+                          {d.points > 0 ? '+' : ''}{d.points.toFixed(1)}
                         </span>
                       )}
                     </div>
