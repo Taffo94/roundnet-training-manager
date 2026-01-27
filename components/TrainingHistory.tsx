@@ -45,11 +45,11 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
       <head><meta charset="UTF-8"></head>
       <body>
         <table>
-          <tr><th colspan="5" style="font-size:18px;">Roundnet Milano - Report Allenamento</th></tr>
+          <tr><th colspan="5" style="font-size:18px; font-weight:bold;">Roundnet Milano - Report Allenamento</th></tr>
           <tr><th colspan="5">Data: ${dateStr}</th></tr>
-          <tr><th colspan="5">Atleti: ${session.participantIds.length}</th></tr>
+          <tr><th colspan="5">Partecipanti: ${session.participantIds.length}</th></tr>
           <tr></tr>
-          <tr style="background-color:#eeeeee;">
+          <tr style="background-color:#CC0000; color:white;">
             <th>Round</th>
             <th>Team 1</th>
             <th>Team 2</th>
@@ -75,7 +75,6 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
     });
 
     html += `</table></body></html>`;
-
     const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -85,16 +84,25 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
 
   const handleDownloadPDF = (sessionId: string) => {
     const element = document.getElementById(`pdf-content-${sessionId}`);
-    if (!element || !(window as any).html2pdf) return;
+    if (!element || !(window as any).html2pdf) {
+      console.error("html2pdf library or element not found");
+      return;
+    }
 
     const opt = {
-      margin: 10,
-      filename: `Report_RMI_${new Date().toISOString().split('T')[0]}.pdf`,
+      margin: [10, 10, 10, 10],
+      filename: `Report_Allenamento_RMI_${new Date().toISOString().split('T')[0]}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true,
+        logging: false,
+        letterRendering: true
+      },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
+    // Usiamo html2pdf per scaricare direttamente
     (window as any).html2pdf().set(opt).from(element).save();
   };
 
@@ -116,7 +124,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
 
       {sessions.map(session => (
         <React.Fragment key={session.id}>
-          {/* Layout Visivo per la WebApp */}
+          {/* VISTA WEB DETTAGLIATA (EDITABILE) */}
           <details id={`session-details-${session.id}`} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden group mb-6">
             <summary className="p-6 flex justify-between items-center cursor-pointer hover:bg-slate-50 list-none transition-all">
               <div className="flex items-center gap-6">
@@ -129,8 +137,8 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                 <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); exportToExcel(session); }} className="text-slate-400 hover:text-green-600 p-2 transition-all transform hover:scale-110" title="Scarica Excel (.xls)">📊</button>
-                 <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownloadPDF(session.id); }} className="text-slate-400 hover:text-red-600 p-2 transition-all transform hover:scale-110" title="Download Diretto PDF">📄</button>
+                 <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); exportToExcel(session); }} className="text-slate-400 hover:text-green-600 p-2 transition-all transform hover:scale-110" title="Esporta Excel">📊</button>
+                 <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownloadPDF(session.id); }} className="text-slate-400 hover:text-red-600 p-2 transition-all transform hover:scale-110" title="Scarica PDF">📄</button>
                  {isAdmin && <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDeleteSession(session.id); }} className="text-slate-300 hover:text-red-600 p-2">🗑️</button>}
                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-300 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </div>
@@ -138,9 +146,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
             
             <div className="p-8 border-t border-slate-100 bg-slate-50/50 space-y-10">
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-sm font-black text-slate-800 uppercase tracking-tight">Allenamento del {new Date(session.date).toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span>
-                </div>
+                <span className="text-sm font-black text-slate-800 uppercase tracking-tight">Allenamento del {new Date(session.date).toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span>
                 {isAdmin && (
                   <div className="relative">
                     <button onClick={() => handleOpenDatePicker(session.id)} className="bg-slate-50 border border-slate-200 px-6 py-2.5 rounded-xl text-[10px] font-black text-red-600 hover:bg-red-50 transition-all uppercase tracking-widest">✏️ Modifica Data</button>
@@ -193,42 +199,52 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
             </div>
           </details>
 
-          {/* Layout NASCOSTO dedicato per l'EXPORT PDF (Ultra Compatto) */}
-          <div id={`pdf-content-${session.id}`} className="fixed top-[-9999px] left-[-9999px] w-[210mm] bg-white text-slate-900 p-8">
-            <div className="flex justify-between items-end border-b-2 border-slate-900 pb-2 mb-4">
+          {/* TEMPLATE PDF NASCOSTO (ULTRA COMPATTO) */}
+          <div 
+            id={`pdf-content-${session.id}`} 
+            className="absolute opacity-0 pointer-events-none" 
+            style={{ width: '190mm', padding: '10px', backgroundColor: 'white', color: '#1e293b', fontFamily: 'Inter, sans-serif' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '2px solid #000', paddingBottom: '5px', marginBottom: '15px' }}>
               <div>
-                <h1 className="text-xl font-black uppercase italic tracking-tight">Report Allenamento</h1>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Roundnet Milano - {new Date(session.date).toLocaleDateString()}</p>
+                <h1 style={{ fontSize: '18px', fontWeight: '900', textTransform: 'uppercase', fontStyle: 'italic', margin: 0 }}>Report Allenamento</h1>
+                <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', margin: 0 }}>Roundnet Milano - {new Date(session.date).toLocaleDateString()}</p>
               </div>
-              <div className="text-right">
-                <div className="text-lg font-black text-red-600 italic leading-none">RMI TRAINING</div>
-                <div className="text-[8px] uppercase font-bold text-slate-400">{session.participantIds.length} Atleti • {session.rounds.length} Round</div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '16px', fontWeight: '900', color: '#dc2626', fontStyle: 'italic', margin: 0 }}>RMI TRAINING</div>
+                <div style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', color: '#94a3b8' }}>{session.participantIds.length} Atleti • {session.rounds.length} Round</div>
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {session.rounds.map(round => (
-                <div key={round.id} className="border border-slate-100 rounded-lg p-2 bg-slate-50/30">
-                  <div className="bg-slate-800 text-white px-2 py-0.5 rounded text-[8px] font-black uppercase mb-2 inline-block">Round {round.roundNumber} - {round.mode}</div>
-                  <table className="w-full text-[10px]">
-                    <thead className="text-[7px] text-slate-400 uppercase font-black text-left">
-                      <tr>
-                        <th className="pb-1">Team 1</th>
-                        <th className="pb-1 text-center">Score</th>
-                        <th className="pb-1 text-right">Team 2</th>
+                <div key={round.id} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px', backgroundColor: '#f8fafc' }}>
+                  <div style={{ backgroundColor: '#1e293b', color: 'white', display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '900', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    Round {round.roundNumber} - {round.mode}
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                    <thead>
+                      <tr style={{ fontSize: '8px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '900' }}>
+                        <th style={{ textAlign: 'left', paddingBottom: '4px' }}>Team 1</th>
+                        <th style={{ textAlign: 'center', paddingBottom: '4px' }}>Risultato</th>
+                        <th style={{ textAlign: 'right', paddingBottom: '4px' }}>Team 2</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody>
                       {round.matches.map(m => {
                         const p1 = getPlayer(m.team1.playerIds[0])?.name || '---';
                         const p2 = getPlayer(m.team1.playerIds[1])?.name || '---';
                         const p3 = getPlayer(m.team2.playerIds[0])?.name || '---';
                         const p4 = getPlayer(m.team2.playerIds[1])?.name || '---';
                         return (
-                          <tr key={m.id} className="py-1">
-                            <td className="py-1.5 font-bold text-slate-800">{p1} / {p2}</td>
-                            <td className="py-1.5 text-center"><span className="bg-slate-900 text-white px-2 py-0.5 rounded font-black italic">{m.team1.score} - {m.team2.score}</span></td>
-                            <td className="py-1.5 text-right font-bold text-slate-800">{p3} / {p4}</td>
+                          <tr key={m.id} style={{ borderTop: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '6px 0', fontWeight: 'bold', color: '#0f172a' }}>{p1} / {p2}</td>
+                            <td style={{ textAlign: 'center', padding: '6px 0' }}>
+                              <span style={{ backgroundColor: '#0f172a', color: 'white', padding: '2px 8px', borderRadius: '4px', fontWeight: '900', fontStyle: 'italic' }}>
+                                {m.team1.score} - {m.team2.score}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'right', padding: '6px 0', fontWeight: 'bold', color: '#0f172a' }}>{p3} / {p4}</td>
                           </tr>
                         );
                       })}
@@ -238,7 +254,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
               ))}
             </div>
             
-            <div className="mt-6 pt-2 border-t border-slate-200 text-center text-[7px] font-bold text-slate-300 uppercase tracking-widest">
+            <div style={{ marginTop: '20px', paddingTop: '10px', borderTop: '1px solid #e2e8f0', textAlign: 'center', fontSize: '8px', fontWeight: 'bold', color: '#cbd5e1', textTransform: 'uppercase' }}>
               Generato da RMI Manager - Documento Ufficiale Roundnet Milano
             </div>
           </div>
