@@ -59,33 +59,48 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
   };
 
   const exportToExcel = (session: TrainingSession) => {
-    const rows: string[][] = [];
-    rows.push(['Roundnet Milano - Report Allenamento']);
-    rows.push(['Data', new Date(session.date).toLocaleDateString()]);
-    rows.push(['Partecipanti', session.participantIds.length.toString()]);
-    rows.push([]);
-    rows.push(['Round', 'Team 1 (Giocatori)', 'Team 2 (Giocatori)', 'Punteggio', 'Modalità', 'Delta Punti']);
-    
+    // Generiamo un file HTML che Excel riconosce come foglio di calcolo con formattazione
+    const dateStr = new Date(session.date).toLocaleDateString();
+    let html = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="UTF-8"></head>
+      <body>
+        <table>
+          <tr><th colspan="5" style="font-size:18px;">Roundnet Milano - Report Allenamento</th></tr>
+          <tr><th colspan="5">Data: ${dateStr}</th></tr>
+          <tr><th colspan="5">Atleti: ${session.participantIds.length}</th></tr>
+          <tr></tr>
+          <tr style="background-color:#eeeeee;">
+            <th>Round</th>
+            <th>Team 1</th>
+            <th>Team 2</th>
+            <th>Punteggio</th>
+            <th>Modalità</th>
+          </tr>
+    `;
+
     session.rounds.forEach(round => {
       round.matches.forEach(match => {
         const p1 = getPlayer(match.team1.playerIds[0])?.name || '---', p2 = getPlayer(match.team1.playerIds[1])?.name || '---';
         const p3 = getPlayer(match.team2.playerIds[0])?.name || '---', p4 = getPlayer(match.team2.playerIds[1])?.name || '---';
-        rows.push([
-          `Round ${round.roundNumber}`,
-          `${p1} / ${p2}`,
-          `${p3} / ${p4}`,
-          match.status === 'COMPLETED' ? `${match.team1.score} - ${match.team2.score}` : 'In corso',
-          round.mode,
-          match.pointsDelta ? match.pointsDelta.toString() : '0'
-        ]);
+        html += `
+          <tr>
+            <td>Round ${round.roundNumber}</td>
+            <td>${p1} / ${p2}</td>
+            <td>${p3} / ${p4}</td>
+            <td style="text-align:center;">${match.status === 'COMPLETED' ? `${match.team1.score}-${match.team2.score}` : '---'}</td>
+            <td>${round.mode}</td>
+          </tr>
+        `;
       });
     });
 
-    const csvContent = rows.map(r => r.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    html += `</table></body></html>`;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `Allenamento_RMI_${new Date(session.date).toISOString().split('T')[0]}.csv`;
+    link.download = `Report_RMI_${new Date(session.date).toISOString().split('T')[0]}.xls`;
     link.click();
   };
 
@@ -104,7 +119,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
       {sessions.map(session => {
         const participants = players.filter(p => session.participantIds.includes(p.id)).sort((a,b) => a.name.localeCompare(b.name));
         return (
-          <details key={session.id} id={`session-details-${session.id}`} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden group mb-6 print:border-none print:shadow-none print:break-after-page">
+          <details key={session.id} id={`session-details-${session.id}`} className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden group mb-6 print:border-none print:shadow-none print:bg-transparent print:mb-0">
             <summary className="p-6 flex justify-between items-center cursor-pointer hover:bg-slate-50 list-none transition-all print:hidden">
               <div className="flex items-center gap-6">
                 <div className="bg-red-600 text-white font-black p-4 px-5 rounded-2xl text-[11px] uppercase tracking-widest shadow-lg italic text-center min-w-[100px]">
@@ -116,18 +131,18 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                 <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); exportToExcel(session); }} className="text-slate-400 hover:text-green-600 p-2 transition-all transform hover:scale-110" title="Scarica Excel (CSV)">📊</button>
+                 <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); exportToExcel(session); }} className="text-slate-400 hover:text-green-600 p-2 transition-all transform hover:scale-110" title="Scarica Excel (.xls)">📊</button>
                  <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownloadPDF(session.id); }} className="text-slate-400 hover:text-red-600 p-2 transition-all transform hover:scale-110" title="Scarica PDF">📄</button>
                  {isAdmin && <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDeleteSession(session.id); }} className="text-slate-300 hover:text-red-600 p-2 transition-colors">🗑️</button>}
                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-300 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </div>
             </summary>
             
-            <div className="p-8 border-t border-slate-100 bg-slate-50/50 space-y-10 print:bg-white print:p-0 print:border-none">
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between print:border-none print:px-0">
+            <div className="p-8 border-t border-slate-100 bg-slate-50/50 space-y-10 print:bg-white print:p-0 print:border-none print:space-y-4">
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between print:border-none print:p-0 print:mb-4 print:shadow-none">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest print:hidden">Data Registrata:</span>
-                  <span className="text-sm font-black text-slate-800 uppercase tracking-tight">Allenamento del {new Date(session.date).toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                  <span className="text-sm font-black text-slate-800 uppercase tracking-tight print:text-base">Allenamento del {new Date(session.date).toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span>
                 </div>
                 {isAdmin && (
                   <div className="relative print:hidden">
@@ -141,49 +156,52 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
               {session.rounds.map(round => {
                 const conflicts = getConflicts(round);
                 return (
-                  <div key={round.id} className="space-y-6">
-                    <div className="flex justify-between items-center">
-                      <div className="text-[10px] font-black text-slate-800 uppercase tracking-[0.3em] bg-white px-5 py-2 rounded-full border border-slate-200 shadow-sm">Round {round.roundNumber} ({round.mode})</div>
+                  <div key={round.id} className="space-y-6 print:space-y-2 print:break-inside-avoid">
+                    <div className="flex justify-between items-center print:justify-start print:gap-4">
+                      <div className="text-[10px] font-black text-slate-800 uppercase tracking-[0.3em] bg-white px-5 py-2 rounded-full border border-slate-200 shadow-sm print:text-[8px] print:py-1 print:px-3">Round {round.roundNumber} ({round.mode})</div>
                       {isAdmin && conflicts.size > 0 && <span className="text-[9px] font-black text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-100 animate-pulse uppercase tracking-widest print:hidden">⚠️ Conflitto</span>}
                     </div>
-                    <div className="grid grid-cols-1 gap-4">
+                    <div className="grid grid-cols-1 gap-4 print:gap-2">
                       {round.matches.map(m => (
-                        <div key={m.id} className="bg-white p-6 rounded-2xl border border-slate-100 flex flex-col md:flex-row items-center gap-8 shadow-sm hover:shadow-md transition-all">
-                          <div className="flex-1 grid grid-cols-2 gap-10 w-full">
+                        <div key={m.id} className="bg-white p-6 rounded-2xl border border-slate-100 flex flex-col md:flex-row items-center gap-8 shadow-sm hover:shadow-md transition-all print:p-3 print:gap-4 print:shadow-none print:border-slate-200">
+                          <div className="flex-1 grid grid-cols-2 gap-10 w-full print:gap-4">
                             {[1, 2].map(t => {
                                const teamIds = t === 1 ? m.team1.playerIds : m.team2.playerIds;
                                const teamScore = t === 1 ? m.team1.score : m.team2.score;
                                const oppScore = t === 1 ? m.team2.score : m.team1.score;
                                return (
-                                <div key={t} className={`space-y-3 ${t === 2 ? 'text-right' : ''}`}>
+                                <div key={t} className={`space-y-3 print:space-y-1 ${t === 2 ? 'text-right' : ''}`}>
                                   <div className={`flex justify-between items-center ${t === 2 ? 'flex-row-reverse' : ''}`}>
-                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 print:text-[7px]">
                                       T{t} {m.status === 'COMPLETED' && renderStatusBadge(teamScore!, oppScore!)}
                                     </span>
-                                    <span className="text-[9px] font-black text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-100 shadow-sm">{getTeamPoints(teamIds)} PT</span>
+                                    <span className="text-[9px] font-black text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-100 shadow-sm print:text-[7px] print:py-0.5">{getTeamPoints(teamIds)} PT</span>
                                   </div>
-                                  <div className="space-y-2">
+                                  <div className="space-y-2 print:space-y-0.5">
                                     {teamIds.map((id, idx) => {
                                       const player = getPlayer(id);
                                       const delta = m.individualDeltas?.[id];
                                       return (
                                         <div key={idx} className="flex items-center gap-2">
                                           {isAdmin && m.status === 'PENDING' ? (
-                                            <select value={id} onChange={(e) => onUpdatePlayers(session.id, round.id, m.id, t as 1|2, idx as 0|1, e.target.value)} className={`text-[11px] font-bold p-1.5 w-full border rounded-xl outline-none shadow-sm ${conflicts.has(id) ? 'border-red-500 bg-red-50 text-red-600' : 'bg-white border-slate-200 focus:border-red-600'}`}>
+                                            <select value={id} onChange={(e) => onUpdatePlayers(session.id, round.id, m.id, t as 1|2, idx as 0|1, e.target.value)} className={`text-[11px] font-bold p-1.5 w-full border rounded-xl outline-none shadow-sm print:hidden ${conflicts.has(id) ? 'border-red-500 bg-red-50 text-red-600' : 'bg-white border-slate-200 focus:border-red-600'}`}>
                                               <option value="">Scegli...</option>
                                               {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                             </select>
                                           ) : (
                                             <div className={`flex items-center gap-2 w-full ${t === 2 ? 'justify-end' : ''}`}>
-                                              <button onClick={() => onSelectPlayer(id)} className={`text-[13px] font-black hover:text-red-600 truncate tracking-tight transition-colors ${t === 2 ? 'text-right order-2' : 'text-left'} ${isAdmin && conflicts.has(id) ? 'text-red-600 underline decoration-2 decoration-red-400 underline-offset-2' : 'text-slate-800'}`}>
+                                              <button onClick={() => onSelectPlayer(id)} className={`text-[13px] font-black hover:text-red-600 truncate tracking-tight transition-colors print:text-[10px] ${t === 2 ? 'text-right order-2' : 'text-left'} ${isAdmin && conflicts.has(id) ? 'text-red-600 underline decoration-2 decoration-red-400 underline-offset-2' : 'text-slate-800'}`}>
                                                 {player?.name || '???'}
                                               </button>
                                               {delta !== undefined && (
-                                                <span className={`text-[9px] font-black italic px-1.5 py-0.5 rounded ${delta >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                                                <span className={`text-[9px] font-black italic px-1.5 py-0.5 rounded print:text-[7px] print:py-0 ${delta >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
                                                   {delta >= 0 ? '+' : ''}{delta.toFixed(1)}
                                                 </span>
                                               )}
                                             </div>
+                                          )}
+                                          {isAdmin && m.status === 'PENDING' && (
+                                            <div className="hidden print:block text-[10px] font-black">{player?.name || '???'}</div>
                                           )}
                                         </div>
                                       );
@@ -196,12 +214,12 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                           <div className="flex items-center gap-2">
                             {m.status === 'COMPLETED' ? (
                               <div className="flex flex-col items-center">
-                                <div className="bg-slate-900 text-white px-5 py-2.5 rounded-2xl font-black text-2xl italic tracking-tighter shadow-xl border-2 border-white">{m.team1.score} - {m.team2.score}</div>
+                                <div className="bg-slate-900 text-white px-5 py-2.5 rounded-2xl font-black text-2xl italic tracking-tighter shadow-xl border-2 border-white print:text-lg print:py-1 print:px-3 print:rounded-lg print:shadow-none">{m.team1.score} - {m.team2.score}</div>
                                 {isAdmin && <button onClick={() => onReopenMatch(session.id, round.id, m.id)} className="text-[9px] font-black uppercase text-slate-400 hover:text-red-600 mt-2 tracking-widest transition-colors print:hidden">Modifica</button>}
                               </div>
                             ) : (
                               isAdmin && (
-                                <div className="flex gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-inner">
+                                <div className="flex gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 shadow-inner print:hidden">
                                   <input type="number" placeholder="0" className="w-12 h-10 text-center font-black text-sm rounded-lg border-none bg-white outline-none focus:ring-2 focus:ring-red-600/20" onChange={e => setMatchScores(p => ({ ...p, [m.id]: { ...(p[m.id] || { s1: '', s2: '' }), s1: e.target.value } }))} />
                                   <input type="number" placeholder="0" className="w-12 h-10 text-center font-black text-sm rounded-lg border-none bg-white outline-none focus:ring-2 focus:ring-red-600/20" onChange={e => setMatchScores(p => ({ ...p, [m.id]: { ...(p[m.id] || { s1: '', s2: '' }), s2: e.target.value } }))} />
                                   <button onClick={() => { 

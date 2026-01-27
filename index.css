@@ -12,10 +12,16 @@ body {
   @apply bg-clip-text text-transparent bg-gradient-to-r from-red-600 to-red-500;
 }
 
-/* Stili per la stampa PDF */
+/* Stili per la stampa PDF - Versione Compatta */
 @media print {
+  @page {
+    margin: 1cm;
+    size: auto;
+  }
+
   body {
     background: white !important;
+    font-size: 10pt;
   }
   
   header, footer, nav, button, summary, .print\:hidden {
@@ -39,9 +45,23 @@ body {
     margin: 0 !important;
   }
 
-  .print\:break-after-page {
-    page-break-after: always;
+  .print\:break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
+
+  /* Compattazione layout */
+  .p-8 { padding: 0.5rem !important; }
+  .p-6 { padding: 0.25rem !important; }
+  .space-y-10 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.5rem !important; }
+  .space-y-8 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.5rem !important; }
+  .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.25rem !important; }
+  .gap-8 { gap: 0.5rem !important; }
+  .gap-10 { gap: 1rem !important; }
+
+  /* Arrotondamenti e ombre inutili in stampa */
+  .rounded-3xl { rounded: 0.5rem !important; }
+  .shadow-sm, .shadow-md, .shadow-xl { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
 
   /* Assicura che i colori siano mantenuti */
   * {
