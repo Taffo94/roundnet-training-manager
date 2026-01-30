@@ -71,7 +71,7 @@ Per ogni atleta:
   - Vedere il dettaglio **statistiche** personali e degli altri atleti
 
 ### 🔐 Area Admin
-- Accesso protetto da password (nel codice attuale: `RMI_Training`)
+- Accesso protetto da password
 - Permette di:
   - Aggiungere/modificare/eliminare atleti
   - Creare sessioni, generare round e partite
