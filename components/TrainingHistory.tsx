@@ -1,6 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { TrainingSession, Player, MatchmakingMode, Round } from '../types';
+import * as XLSX from 'xlsx';
 
 interface TrainingHistoryProps {
   sessions: TrainingSession[];
@@ -39,46 +40,68 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
   };
 
   const exportToExcel = (session: TrainingSession) => {
-    const dateStr = new Date(session.date).toLocaleDateString();
-    let html = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head><meta charset="UTF-8"></head>
-      <body>
-        <table>
-          <tr><th colspan="5" style="font-size:18px; font-weight:bold; color:#CC0000;">Roundnet Milano - Training Report</th></tr>
-          <tr><th colspan="5">Data: ${dateStr}</th></tr>
-          <tr></tr>
-          <tr style="background-color:#333; color:white;">
-            <th>Round</th>
-            <th>Team 1</th>
-            <th>Team 2</th>
-            <th>Punteggio</th>
-            <th>Modalità</th>
-          </tr>
-    `;
-
+    // Prepara i dati come array di array
+    const data: any[][] = [];
+    
+    // Header principale
+    data.push(['Roundnet Milano - Training Report']);
+    data.push(['Data', new Date(session.date)]); // La data viene inserita come oggetto Date per formattazione corretta
+    data.push(['Atleti presenti', session.participantIds.length]);
+    data.push(['Round totali', session.rounds.length]);
+    data.push([]); // Riga vuota
+    
+    // Header colonne
+    data.push(['Round', 'Giocatore 1 T1', 'Giocatore 2 T1', 'Giocatore 1 T2', 'Giocatore 2 T2', 'Punteggio T1', 'Punteggio T2', 'Modalità']);
+    
+    // Dati delle partite
     session.rounds.forEach(round => {
       round.matches.forEach(match => {
-        const p1 = getPlayer(match.team1.playerIds[0])?.name || '---', p2 = getPlayer(match.team1.playerIds[1])?.name || '---';
-        const p3 = getPlayer(match.team2.playerIds[0])?.name || '---', p4 = getPlayer(match.team2.playerIds[1])?.name || '---';
-        html += `
-          <tr>
-            <td>Round ${round.roundNumber}</td>
-            <td>${p1} / ${p2}</td>
-            <td>${p3} / ${p4}</td>
-            <td style="text-align:center;">${match.status === 'COMPLETED' ? `${match.team1.score}-${match.team2.score}` : '---'}</td>
-            <td>${round.mode}</td>
-          </tr>
-        `;
+        const p1 = getPlayer(match.team1.playerIds[0])?.name || '---';
+        const p2 = getPlayer(match.team1.playerIds[1])?.name || '---';
+        const p3 = getPlayer(match.team2.playerIds[0])?.name || '---';
+        const p4 = getPlayer(match.team2.playerIds[1])?.name || '---';
+        const score1 = match.status === 'COMPLETED' ? match.team1.score : null;
+        const score2 = match.status === 'COMPLETED' ? match.team2.score : null;
+        
+        data.push([
+          round.roundNumber,
+          p1,
+          p2,
+          p3,
+          p4,
+          score1,
+          score2,
+          round.mode.replace('_', ' ')
+        ]);
       });
     });
-
-    html += `</table></body></html>`;
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `RMI_Report_${new Date(session.date).toISOString().split('T')[0]}.xls`;
-    link.click();
+    
+    // Crea il workbook e il worksheet
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    
+    // Imposta la larghezza delle colonne
+    ws['!cols'] = [
+      { wch: 10 },  // Round
+      { wch: 20 },  // Giocatore 1 T1
+      { wch: 20 },  // Giocatore 2 T1
+      { wch: 20 },  // Giocatore 1 T2
+      { wch: 20 },  // Giocatore 2 T2
+      { wch: 12 },  // Punteggio T1
+      { wch: 12 },  // Punteggio T2
+      { wch: 20 }   // Modalità
+    ];
+    
+    // Formatta la cella della data come data
+    if (ws['B2']) {
+      ws['B2'].t = 'd'; // Tipo data
+      ws['B2'].z = 'dd/mm/yyyy'; // Formato data
+    }
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Training Report');
+    
+    // Scarica il file
+    XLSX.writeFile(wb, `RMI_Report_${new Date(session.date).toISOString().split('T')[0]}.xlsx`);
   };
 
   const handleDownloadPDF = (session: TrainingSession) => {

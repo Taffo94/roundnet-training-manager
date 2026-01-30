@@ -259,7 +259,8 @@ const App: React.FC = () => {
             onUpdatePlayer={(id, n, g, b, m) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, name: n, gender: g, basePoints: b, matchPoints: m } : x) }) : null)} 
             onDeletePlayer={(id) => window.confirm("Eliminare?") && setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null)} 
             onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
-            onResetPoints={resetAllPoints} onRecalculate={recalculateRanking} 
+            onResetPoints={resetAllPoints} onRecalculate={recalculateRanking}
+            onToggleHidden={(id) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, isHidden: !x.isHidden } : x) }) : null)}
           />
         )}
         {isAdmin && state.currentTab === 'training' && (

@@ -11,6 +11,7 @@ export interface Player {
   basePoints: number; // Punti assegnati manualmente
   matchPoints: number; // Punti derivanti dalle partite
   lastActive: number;
+  isHidden?: boolean; // Se true, il giocatore è nascosto dalla classifica per gli utenti normali
 }
 
 export enum MatchmakingMode {
