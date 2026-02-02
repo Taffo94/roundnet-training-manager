@@ -1,71 +1,105 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { AppState } from '../types';
+import { AppState, Player, TrainingSession } from '../types';
 
-// ✅ CORRETTO PER VITE - Use type assertion to avoid TS errors if Vite types are not in scope
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
 
 let supabase: SupabaseClient | null = null;
-
 if (SUPABASE_URL && SUPABASE_ANON_KEY) {
   supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
-// Fix: Add missing selectedPlayerId property to DEFAULT_STATE
-const DEFAULT_STATE: AppState = {
-  players: [],
-  sessions: [],
-  currentTab: 'ranking',
-  selectedPlayerId: null
-};
+const LOCAL_STORAGE_BACKUP_KEY = 'rmi_manager_local_backup';
 
-export const isDBConfigured = (): boolean => {
-  return !!supabase;
-};
+export const isDBConfigured = (): boolean => !!supabase;
 
-export const getSupabaseConfig = () => ({
-  url: SUPABASE_URL,
-  hasKey: !!SUPABASE_ANON_KEY
-});
-
-export const loadStateFromDB = async (): Promise<AppState> => {
+export const loadFullState = async (): Promise<{players: Player[], sessions: TrainingSession[]}> => {
   if (!supabase) {
-    throw new Error("Client Supabase non inizializzato. Verifica le variabili d'ambiente.");
+    const local = localStorage.getItem(LOCAL_STORAGE_BACKUP_KEY);
+    return local ? JSON.parse(local) : { players: [], sessions: [] };
   }
 
-  const { data, error } = await supabase
-    .from('app_data')
-    .select('state')
-    .eq('id', 1)
-    .single();
+  // Carichiamo i dati in parallelo dalle due tabelle
+  const [playersRes, sessionsRes] = await Promise.all([
+    supabase.from('players').select('*'),
+    supabase.from('sessions').select('*').order('date', { ascending: false })
+  ]);
 
-  if (error) {
-    if (error.code === 'PGRST116') { // Record non trovato: normale al primo avvio
-      try {
-        await saveStateToDB(DEFAULT_STATE);
-      } catch (e) {
-        console.warn("Impossibile creare lo stato iniziale:", e);
-      }
-      return DEFAULT_STATE;
-    }
-    // Rilanciamo l'errore per permettere all'app di mostrarlo
-    throw error;
-  }
+  if (playersRes.error) throw playersRes.error;
+  if (sessionsRes.error) throw sessionsRes.error;
 
-  return (data.state as AppState) || DEFAULT_STATE;
+  const players: Player[] = (playersRes.data || []).map(p => ({
+    id: p.id,
+    name: p.name,
+    gender: p.gender,
+    basePoints: p.base_points,
+    matchPoints: p.match_points,
+    wins: p.wins,
+    losses: p.losses,
+    isHidden: p.is_hidden,
+    lastActive: Date.now()
+  }));
+
+  const sessions: TrainingSession[] = (sessionsRes.data || []).map(s => ({
+    id: s.id,
+    date: s.date,
+    status: s.status,
+    participantIds: s.participant_ids,
+    rounds: s.rounds
+  }));
+
+  return { players, sessions };
 };
 
-export const saveStateToDB = async (state: AppState) => {
+// Salvataggio granulare: salviamo solo quello che serve
+export const savePlayersToDB = async (players: Player[]) => {
+  if (!supabase) return;
+  
+  // Mappiamo i dati per il DB (snake_case)
+  const dbData = players.map(p => ({
+    id: p.id,
+    name: p.name,
+    gender: p.gender,
+    base_points: p.basePoints,
+    match_points: p.matchPoints,
+    wins: p.wins,
+    losses: p.losses,
+    is_hidden: p.isHidden
+  }));
+
+  const { error } = await supabase.from('players').upsert(dbData);
+  if (error) throw error;
+};
+
+export const saveSessionsToDB = async (sessions: TrainingSession[]) => {
   if (!supabase) return;
 
-  const { error } = await supabase
-    .from('app_data')
-    .upsert({
-      id: 1,
-      state,
-      updated_at: new Date().toISOString()
-    });
-    
+  const dbData = sessions.map(s => ({
+    id: s.id,
+    date: s.date,
+    status: s.status,
+    participant_ids: s.participantIds,
+    rounds: s.rounds
+  }));
+
+  const { error } = await supabase.from('sessions').upsert(dbData);
   if (error) throw error;
+};
+
+export const deletePlayerFromDB = async (id: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('players').delete().eq('id', id);
+  if (error) throw error;
+};
+
+export const deleteSessionFromDB = async (id: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('sessions').delete().eq('id', id);
+  if (error) throw error;
+};
+
+// Backup locale per sicurezza estrema
+export const saveLocalBackup = (players: Player[], sessions: TrainingSession[]) => {
+  localStorage.setItem(LOCAL_STORAGE_BACKUP_KEY, JSON.stringify({ players, sessions }));
 };
