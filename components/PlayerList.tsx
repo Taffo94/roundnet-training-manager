@@ -17,6 +17,16 @@ interface PlayerListProps {
   onImport?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
+const InfoTooltip = ({ text, position = 'bottom' }: { text: string, position?: 'top' | 'bottom' }) => (
+  <span className="ml-1 cursor-help group relative inline-block">
+    <span className="text-slate-400 font-bold bg-slate-100 rounded-full w-3.5 h-3.5 inline-flex items-center justify-center text-[8px]">?</span>
+    <span className={`pointer-events-none absolute ${position === 'bottom' ? 'top-full mt-2' : 'bottom-full mb-2'} left-1/2 -translate-x-1/2 w-48 p-2 bg-slate-900 text-white text-[9px] font-normal normal-case rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-[100] shadow-2xl`}>
+      {text}
+      <span className={`absolute ${position === 'bottom' ? 'bottom-full border-b-slate-900 rotate-180' : 'top-full border-t-slate-900'} left-1/2 -translate-x-1/2 border-8 border-transparent`}></span>
+    </span>
+  </span>
+);
+
 const PlayerList: React.FC<PlayerListProps> = ({ 
   players, deltas, isAdmin, onAddPlayer, onUpdatePlayer, onDeletePlayer, onSelectPlayer, onResetPoints, onRecalculate, onToggleHidden, onExport, onImport 
 }) => {
@@ -56,7 +66,7 @@ const PlayerList: React.FC<PlayerListProps> = ({
         {isAdmin && (
           <div className="flex gap-2">
             <button onClick={onRecalculate} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-md">Ricalcola Classifica</button>
-            <button onClick={onExport} className="bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Export JSON</button>
+            <button onClick={onExport} className="bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Full Backup JSON</button>
             <button onClick={() => fileInputRef.current?.click()} className="bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Import</button>
             <input type="file" ref={fileInputRef} onChange={onImport} className="hidden" accept=".json" />
           </div>
@@ -96,9 +106,15 @@ const PlayerList: React.FC<PlayerListProps> = ({
               <th className="px-6 py-4">Rank</th>
               <th className="px-6 py-4">Atleta</th>
               <th className="px-6 py-4 text-center">Sesso</th>
-              <th className="px-6 py-4 text-center">Match Points</th>
-              <th className="px-6 py-4 text-center text-red-600 font-black italic">Totale</th>
-              <th className="px-6 py-4 text-center">V / S</th>
+              <th className="px-6 py-4 text-center whitespace-nowrap">
+                Match Points <InfoTooltip text="Punti accumulati esclusivamente giocando partite durante gli allenamenti." />
+              </th>
+              <th className="px-6 py-4 text-center text-red-600 font-black italic whitespace-nowrap">
+                Totale <InfoTooltip text="Somma tra Punti Base (fissi) e Match Points (dinamici)." />
+              </th>
+              <th className="px-6 py-4 text-center whitespace-nowrap">
+                V / S <InfoTooltip text="Rapporto tra Vittorie e Sconfitte totali." />
+              </th>
               {isAdmin && <th className="px-6 py-4 text-right">Azioni</th>}
             </tr>
           </thead>
