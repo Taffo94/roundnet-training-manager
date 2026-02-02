@@ -55,8 +55,9 @@ const PlayerList: React.FC<PlayerListProps> = ({
         </div>
         {isAdmin && (
           <div className="flex gap-2">
-            <button onClick={onExport} className="bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Esporta Backup</button>
-            <button onClick={() => fileInputRef.current?.click()} className="bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Importa</button>
+            <button onClick={onRecalculate} className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-md">Ricalcola Classifica</button>
+            <button onClick={onExport} className="bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Export JSON</button>
+            <button onClick={() => fileInputRef.current?.click()} className="bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Import</button>
             <input type="file" ref={fileInputRef} onChange={onImport} className="hidden" accept=".json" />
           </div>
         )}
@@ -162,7 +163,7 @@ const PlayerList: React.FC<PlayerListProps> = ({
                           <>
                             <button onClick={() => handleStartEdit(player)} className="text-slate-300 hover:text-blue-600">✏️</button>
                             <button onClick={() => onToggleHidden(player.id)} className="text-slate-300">{player.isHidden ? '👁️‍🗨️' : '👁️'}</button>
-                            <button onClick={() => window.confirm("Eliminare?") && onDeletePlayer(player.id)} className="text-slate-300 hover:text-red-600">🗑️</button>
+                            <button onClick={() => onDeletePlayer(player.id)} className="text-slate-300 hover:text-red-600">🗑️</button>
                           </>
                         )}
                       </div>

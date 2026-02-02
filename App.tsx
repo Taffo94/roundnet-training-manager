@@ -35,7 +35,6 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const isInitialMount = useRef(true);
 
-  // Caricamento iniziale sicuro
   useEffect(() => {
     loadFullState().then(data => {
       setState({
@@ -47,18 +46,14 @@ const App: React.FC = () => {
       setTimeout(() => { isInitialMount.current = false; }, 800);
     }).catch(err => {
       console.error("Errore fatale caricamento:", err);
-      alert("Errore nel caricamento dati. Se hai appena configurato le tabelle Supabase, è normale.");
     });
   }, []);
 
-  // Sync automatico intelligente: separiamo i salvataggi
   useEffect(() => {
     if (isInitialMount.current || !state) return;
-
     const timer = setTimeout(async () => {
       setIsSyncing(true);
       try {
-        // Salvataggio parallelo ma separato
         await Promise.all([
           savePlayersToDB(state.players),
           saveSessionsToDB(state.sessions)
@@ -70,11 +65,9 @@ const App: React.FC = () => {
         setIsSyncing(false);
       }
     }, 2000);
-
     return () => clearTimeout(timer);
   }, [state?.players, state?.sessions]);
 
-  // Gestione Auth
   useEffect(() => {
     if (auth) localStorage.setItem(AUTH_STORAGE_KEY, auth);
     else localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -107,12 +100,45 @@ const App: React.FC = () => {
     });
   };
 
+  const recalculateAllPoints = async () => {
+    if (!state) return;
+    if (!window.confirm("Attenzione: Questa operazione azzererà tutti i Match Points e ricalcolerà l'intera classifica basandosi cronologicamente su tutti gli allenamenti archiviati. Procedere?")) return;
+    
+    setIsSyncing(true);
+    let updatedPlayers = state.players.map(p => ({ ...p, matchPoints: 0, wins: 0, losses: 0 }));
+    const sortedSessions = [...state.sessions]
+      .filter(s => s.status === 'ARCHIVED')
+      .sort((a, b) => a.date - b.date);
+
+    for (const session of sortedSessions) {
+      for (const round of session.rounds) {
+        for (const match of round.matches) {
+          if (match.status === 'COMPLETED' && match.team1.score !== undefined && match.team2.score !== undefined) {
+            const p1 = updatedPlayers.find(p => p.id === match.team1.playerIds[0]);
+            const p2 = updatedPlayers.find(p => p.id === match.team1.playerIds[1]);
+            const p3 = updatedPlayers.find(p => p.id === match.team2.playerIds[0]);
+            const p4 = updatedPlayers.find(p => p.id === match.team2.playerIds[1]);
+
+            if (p1 && p2 && p3 && p4) {
+              const result = calculateNewRatings(p1, p2, p3, p4, match.team1.score, match.team2.score);
+              updatedPlayers = updatedPlayers.map(p => result.players.find(up => up.id === p.id) || p);
+            }
+          }
+        }
+      }
+    }
+    setState({ ...state, players: updatedPlayers });
+    await savePlayersToDB(updatedPlayers);
+    setIsSyncing(false);
+    alert("Ricalcolo completato con successo!");
+  };
+
   const handleExportData = () => {
     if (!state) return;
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", `RMI_Backup_${new Date().toISOString().split('T')[0]}.json`);
+    downloadAnchorNode.setAttribute("download", `RMI_FullBackup_${new Date().toISOString().split('T')[0]}.json`);
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
@@ -139,7 +165,6 @@ const App: React.FC = () => {
   const isAdmin = auth === 'admin';
   const tabs = isAdmin ? ['ranking', 'training', 'history', 'stats'] : ['ranking', 'history', 'stats'];
 
-  // Calcolo Ranking Deltas (Memoized)
   const rankingDeltas = useMemo(() => {
     if (!state || state.sessions.length === 0) return {};
     const archivedSessions = state.sessions.filter(s => s.status === 'ARCHIVED').sort((a, b) => b.date - a.date);
@@ -169,25 +194,25 @@ const App: React.FC = () => {
     return map;
   }, [state?.sessions]);
 
-  if (!state) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white font-black italic animate-pulse">CARICAMENTO...</div>;
+  if (!state) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white font-black italic animate-pulse uppercase tracking-[0.5em]">Caricamento...</div>;
 
   if (!auth) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center space-y-8">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center space-y-8 animate-in fade-in zoom-in duration-500">
            <div className="flex justify-center"><Logo /></div>
            <h1 className="text-3xl font-black uppercase italic tracking-tighter text-slate-800">Roundnet Milano <span className="text-red-600">Training</span></h1>
            {!showAdminLogin ? (
              <div className="space-y-4">
-               <button onClick={() => setAuth('user')} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 py-4 rounded-2xl font-black uppercase tracking-widest">Accesso Atleta</button>
-               <button onClick={() => setShowAdminLogin(true)} className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-red-200">Area Admin</button>
+               <button onClick={() => setAuth('user')} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 py-4 rounded-2xl font-black uppercase tracking-widest transition-all">Accesso Atleta</button>
+               <button onClick={() => setShowAdminLogin(true)} className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-red-200">Area Admin</button>
              </div>
            ) : (
              <form onSubmit={handleAdminLogin} className="space-y-4">
-               <input type="password" placeholder="Password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-center outline-none focus:border-red-500" autoFocus />
+               <input type="password" placeholder="Password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-center outline-none focus:border-red-500 transition-all" autoFocus />
                <div className="flex gap-3">
-                 <button type="button" onClick={() => setShowAdminLogin(false)} className="flex-1 bg-slate-100 text-slate-600 py-4 rounded-2xl font-black uppercase text-xs">Indietro</button>
-                 <button type="submit" className="flex-[2] bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs shadow-xl">Entra</button>
+                 <button type="button" onClick={() => setShowAdminLogin(false)} className="flex-1 bg-slate-100 text-slate-600 py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Indietro</button>
+                 <button type="submit" className="flex-[2] bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Entra</button>
                </div>
                {loginError && <p className="text-red-600 text-[10px] font-black uppercase">{loginError}</p>}
              </form>
@@ -206,15 +231,15 @@ const App: React.FC = () => {
             <div>
               <h1 className="text-2xl font-black uppercase tracking-tighter italic text-slate-900">RMI <span className="text-red-600">MANAGER</span></h1>
               <div className="flex items-center gap-2 mt-1">
-                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${isAdmin ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-500'} uppercase`}>{isAdmin ? 'Amministratore' : 'Atleta'}</span>
-                {isSyncing && <span className="text-[8px] font-black text-slate-300 uppercase animate-pulse italic">Inviando dati...</span>}
-                <button onClick={() => setAuth(null)} className="text-[9px] font-black text-slate-400 hover:text-red-600 uppercase ml-1">Esci</button>
+                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${isAdmin ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-slate-100 text-slate-500 border border-slate-200'} uppercase`}>{isAdmin ? 'Amministratore' : 'Atleta'}</span>
+                {isSyncing && <span className="text-[8px] font-black text-slate-300 uppercase animate-pulse italic">Sincronizzazione...</span>}
+                <button onClick={() => setAuth(null)} className="text-[9px] font-black text-slate-400 hover:text-red-600 uppercase ml-1 transition-colors">Esci</button>
               </div>
             </div>
           </div>
-          <nav className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
+          <nav className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
             {tabs.map(tab => (
-              <button key={tab} onClick={() => setState(p => p ? ({ ...p, currentTab: tab as any }) : null)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${state.currentTab === tab ? 'bg-white text-red-600 shadow-sm transform scale-105' : 'text-slate-500 hover:text-slate-800'}`}>{tab}</button>
+              <button key={tab} onClick={() => setState(p => p ? ({ ...p, currentTab: tab as any }) : null)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${state.currentTab === tab ? 'bg-white text-red-600 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-800'}`}>{tab}</button>
             ))}
           </nav>
         </div>
@@ -226,9 +251,9 @@ const App: React.FC = () => {
             players={state.players} deltas={rankingDeltas} isAdmin={isAdmin}
             onAddPlayer={(n, g, b) => setState(p => p ? ({ ...p, players: [...p.players, { id: Math.random().toString(36).substr(2, 9), name: n, gender: g, wins: 0, losses: 0, basePoints: b, matchPoints: 0, lastActive: Date.now() }] }) : null)} 
             onUpdatePlayer={(id, n, g, b, m) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, name: n, gender: g, basePoints: b, matchPoints: m } : x) }) : null)} 
-            onDeletePlayer={(id) => { if(window.confirm("Sei sicuro?")) { deletePlayerFromDB(id); setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null); } }} 
+            onDeletePlayer={(id) => { if(window.confirm("Eliminare definitivamente l'atleta?")) { deletePlayerFromDB(id); setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null); } }} 
             onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
-            onResetPoints={() => {}} onRecalculate={() => {}}
+            onResetPoints={() => {}} onRecalculate={recalculateAllPoints}
             onToggleHidden={(id) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, isHidden: !x.isHidden } : x) }) : null)}
             onExport={handleExportData} onImport={handleImportData}
           />
@@ -255,8 +280,12 @@ const App: React.FC = () => {
             sessions={state.sessions.filter(s => s.status === 'ARCHIVED')} players={state.players} isAdmin={isAdmin}
             onUpdateSessionDate={(sid, date) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, date } : s) }) : null)}
             onDeleteRound={(sid, rid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.filter(r => r.id !== rid) } : s) }) : null)} 
-            onDeleteSession={(sid) => { if(window.confirm("Eliminare intera sessione?")) { deleteSessionFromDB(sid); setState(prev => prev ? ({ ...prev, sessions: prev.sessions.filter(s => s.id !== sid) }) : null); } }}
-            onUpdateScore={updateMatchScore} onReopenMatch={() => {}} onUpdatePlayers={() => {}} onUpdateResting={() => {}} onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
+            onDeleteSession={(sid) => { if(window.confirm("Eliminare definitivamente l'intera sessione archiviata?")) { deleteSessionFromDB(sid); setState(prev => prev ? ({ ...prev, sessions: prev.sessions.filter(s => s.id !== sid) }) : null); } }}
+            onUpdateScore={updateMatchScore} 
+            onReopenMatch={(sid, rid, mid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, matches: r.matches.map(m => m.id === mid ? { ...m, status: 'PENDING' } : m) } : r) } : s) }) : null)}
+            onUpdatePlayers={(sid, rid, mid, team, idx, pid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, matches: r.matches.map(m => m.id === mid ? { ...m, [team === 1 ? 'team1' : 'team2']: { ...m[team === 1 ? 'team1' : 'team2'], playerIds: m[team === 1 ? 'team1' : 'team2'].playerIds.map((p, i) => i === idx ? pid : p) } } : m) } : r) } : s) }) : null)}
+            onUpdateResting={(sid, rid, idx, pid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, restingPlayerIds: r.restingPlayerIds.map((p, i) => i === idx ? pid : p) } : r) } : s) }) : null)}
+            onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
           />
         )}
         {state.currentTab === 'stats' && (
