@@ -1,4 +1,3 @@
-
 import { Player, Match, MatchmakingMode, Round } from '../types';
 
 const shuffle = <T,>(array: T[]): T[] => {
@@ -126,11 +125,43 @@ export const generateRound = (
       matches.push(createMatch({id: ''}, {id: ''}, {id: ''}, {id: ''}, mode));
     }
   } else if (mode === MatchmakingMode.SAME_LEVEL) {
+    // Ordiniamo per livello
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
+    
     for (let i = 0; i < numMatches; i++) {
+      // Prendiamo i 4 atleti della stessa fascia di livello
       const block = playersToPair.splice(0, 4);
-      const shuffledBlock = shuffle(block);
-      matches.push(createMatch(shuffledBlock[0], shuffledBlock[1], shuffledBlock[2], shuffledBlock[3], mode));
+      const [p1, p2, p3, p4] = block;
+      
+      // Valutiamo le 3 possibili combinazioni di coppie nel blocco
+      // Opzione A: (p1, p2) vs (p3, p4)
+      // Opzione B: (p1, p3) vs (p2, p4)
+      // Opzione C: (p1, p4) vs (p2, p3)
+      
+      const options = [
+        { 
+          t1: [p1, p2], t2: [p3, p4], 
+          history: getPartnershipCount(p1.id, p2.id, previousRounds) + getPartnershipCount(p3.id, p4.id, previousRounds) 
+        },
+        { 
+          t1: [p1, p3], t2: [p2, p4], 
+          history: getPartnershipCount(p1.id, p3.id, previousRounds) + getPartnershipCount(p2.id, p4.id, previousRounds) 
+        },
+        { 
+          t1: [p1, p4], t2: [p2, p3], 
+          history: getPartnershipCount(p1.id, p4.id, previousRounds) + getPartnershipCount(p2.id, p3.id, previousRounds) 
+        }
+      ];
+
+      // Ordiniamo per minor storia di partnership. 
+      // Se la storia è identica, usiamo Math.random() per variare
+      options.sort((a, b) => {
+        if (a.history !== b.history) return a.history - b.history;
+        return Math.random() - 0.5;
+      });
+
+      const best = options[0];
+      matches.push(createMatch(best.t1[0], best.t1[1], best.t2[0], best.t2[1], mode));
     }
   } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
     // 1. Ordiniamo per ranking decrescente
@@ -141,27 +172,17 @@ export const generateRound = (
       const top = playersToPair.shift()!;
       
       // 3. Cerchiamo il partner analizzando TUTTI i rimanenti
-      // Vogliamo minimizzare la partnershipCount e massimizzare la distanza di rank (Balanced)
       let bestPartnerIdx = 0;
-      let minHistory = Infinity;
-      
-      // Valutiamo i candidati (specialmente quelli verso il fondo della classifica)
-      const candidates = [...playersToPair];
-      let bestScore = -Infinity; // Punteggio composito: -storia (priorità alta) + rank basso
+      let bestScore = -Infinity; 
       
       for (let i = 0; i < playersToPair.length; i++) {
         const history = getPartnershipCount(top.id, playersToPair[i].id, previousRounds);
-        // Punteggio: la storia pesa tantissimo (x1000) per evitare ripetizioni. 
-        // L'indice 'i' (essendo ordinati decrescente) più è alto più il rank è basso.
+        // Priorità alla storia (evitare ripetizioni) e poi al bilanciamento rank (indice alto = rank basso)
         const score = (history * -1000) + i; 
         
         if (score > bestScore) {
           bestScore = score;
           bestPartnerIdx = i;
-        } else if (score === bestScore) {
-          // In caso di parità assoluta (stessa storia e stesso rank, raro ma possibile), 
-          // usiamo un pizzico di casualità
-          if (Math.random() > 0.5) bestPartnerIdx = i;
         }
       }
       
@@ -169,7 +190,6 @@ export const generateRound = (
       const targetScore = getTot(top) + getTot(bottom);
 
       // 4. Cerchiamo il Team B che meglio bilancia il target score 
-      // includendo anche qui un fattore di varietà
       let allPossiblePairs: {p1Idx: number, p2Idx: number, diff: number, pHistory: number}[] = [];
 
       for (let i = 0; i < playersToPair.length; i++) {
@@ -181,10 +201,7 @@ export const generateRound = (
         }
       }
 
-      // Ordiniamo per varietà prima e poi per bilanciamento, o viceversa se il gap è troppo grande
       allPossiblePairs.sort((a, b) => {
-        // Se la differenza di bilanciamento tra due opzioni è minima (< 8 punti), 
-        // diamo priorità assoluta a chi ha giocato meno volte insieme
         if (Math.abs(a.diff - b.diff) < 8) {
            return a.pHistory - b.pHistory;
         }
