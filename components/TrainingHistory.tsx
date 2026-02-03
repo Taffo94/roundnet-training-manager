@@ -17,6 +17,11 @@ interface TrainingHistoryProps {
   onSelectPlayer: (id: string) => void;
 }
 
+const IconPDF = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>;
+const IconExcel = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>;
+const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>;
+const IconEdit = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+
 const TrainingHistory: React.FC<TrainingHistoryProps> = ({ 
   sessions, players, isAdmin, onDeleteRound, onDeleteSession, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onUpdateSessionDate, onSelectPlayer 
 }) => {
@@ -66,8 +71,8 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
           getPlayer(match.team1.playerIds[1])?.name || '---',
           getPlayer(match.team2.playerIds[0])?.name || '---',
           getPlayer(match.team2.playerIds[1])?.name || '---',
-          match.status === 'COMPLETED' ? match.team1.score : null,
-          match.status === 'COMPLETED' ? match.team2.score : null,
+          match.status === 'COMPLETED' ? match.team1.score : '',
+          match.status === 'COMPLETED' ? match.team2.score : '',
           round.mode.replace('_', ' ')
         ]);
       });
@@ -97,7 +102,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
           </div>
         </div>
         
-        <div style="display: grid; grid-template-cols: 1fr 1fr; gap: 20px; margin-bottom: 40px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px;">
           <div style="background: #f8fafc; padding: 20px; border-radius: 15px; border: 1px solid #e2e8f0;">
             <div style="font-size: 10px; font-weight: 900; text-transform: uppercase; color: #94a3b8; margin-bottom: 5px;">Atleti Partecipanti</div>
             <div style="font-size: 24px; font-weight: 900;">${session.participantIds.length}</div>
@@ -113,13 +118,18 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
             <div style="background: #1e293b; color: white; padding: 8px 20px; border-radius: 10px; font-size: 12px; font-weight: 900; text-transform: uppercase; margin-bottom: 15px;">
               Round ${r.roundNumber} - ${r.mode}
             </div>
-            ${r.matches.map(m => `
-              <div style="display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #f1f5f9;">
-                <div style="flex: 1; font-weight: 700;">${getPlayer(m.team1.playerIds[0])?.name} / ${getPlayer(m.team1.playerIds[1])?.name}</div>
-                <div style="background: #f1f5f9; padding: 5px 15px; border-radius: 8px; font-weight: 900; margin: 0 20px;">${m.team1.score} - ${m.team2.score}</div>
-                <div style="flex: 1; text-align: right; font-weight: 700;">${getPlayer(m.team2.playerIds[0])?.name} / ${getPlayer(m.team2.playerIds[1])?.name}</div>
-              </div>
-            `).join('')}
+            ${r.matches.map(m => {
+              const s1 = m.status === 'COMPLETED' ? m.team1.score : '';
+              const s2 = m.status === 'COMPLETED' ? m.team2.score : '';
+              const separator = (s1 !== '' && s2 !== '') ? ' - ' : '';
+              return `
+                <div style="display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #f1f5f9;">
+                  <div style="flex: 1; font-weight: 700;">${getPlayer(m.team1.playerIds[0])?.name || ''} / ${getPlayer(m.team1.playerIds[1])?.name || ''}</div>
+                  <div style="background: #f1f5f9; padding: 5px 15px; border-radius: 8px; font-weight: 900; margin: 0 20px; min-width: 40px; text-align: center;">${s1}${separator}${s2}</div>
+                  <div style="flex: 1; text-align: right; font-weight: 700;">${getPlayer(m.team2.playerIds[0])?.name || ''} / ${getPlayer(m.team2.playerIds[1])?.name || ''}</div>
+                </div>
+              `;
+            }).join('')}
           </div>
         `).join('')}
 
@@ -179,11 +189,11 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{session.rounds.length} Round disputati</div>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                 <button onClick={(e) => { e.preventDefault(); handleDownloadPDF(session); }} className="text-slate-400 hover:text-red-600 p-2 transform hover:scale-110" title="Scarica PDF">📄</button>
-                 <button onClick={(e) => { e.preventDefault(); exportToExcel(session); }} className="text-slate-400 hover:text-green-600 p-2 transform hover:scale-110" title="Scarica Excel">📊</button>
-                 {isAdmin && <button onClick={(e) => { e.preventDefault(); onDeleteSession(session.id); }} className="text-slate-300 hover:text-red-600 p-2" title="Elimina Sessione">🗑️</button>}
-                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-300 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              <div className="flex items-center gap-2">
+                 <button onClick={(e) => { e.preventDefault(); handleDownloadPDF(session); }} className="text-slate-400 hover:text-red-600 p-2 transform hover:scale-110 transition-all" title="Scarica PDF"><IconPDF /></button>
+                 <button onClick={(e) => { e.preventDefault(); exportToExcel(session); }} className="text-slate-400 hover:text-green-600 p-2 transform hover:scale-110 transition-all" title="Scarica Excel"><IconExcel /></button>
+                 {isAdmin && <button onClick={(e) => { e.preventDefault(); onDeleteSession(session.id); }} className="text-slate-300 hover:text-red-600 p-2 transition-colors" title="Elimina Sessione"><IconTrash /></button>}
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-300 group-open:rotate-180 transition-transform ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </div>
             </summary>
             
@@ -192,7 +202,9 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                 <span className="text-sm font-black text-slate-800 uppercase tracking-tight">Allenamento del {new Date(session.date).toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span>
                 {isAdmin && (
                   <div className="relative">
-                    <button onClick={() => handleOpenDatePicker(session.id)} className="bg-slate-50 border border-slate-200 px-6 py-2.5 rounded-xl text-[10px] font-black text-red-600 hover:bg-red-50 uppercase tracking-widest">✏️ Modifica Data</button>
+                    <button onClick={() => handleOpenDatePicker(session.id)} className="bg-slate-50 border border-slate-200 px-6 py-2.5 rounded-xl text-[10px] font-black text-red-600 hover:bg-red-50 uppercase tracking-widest flex items-center gap-2">
+                      <IconEdit /> Modifica Data
+                    </button>
                     <input type="date" ref={el => { dateInputRefs.current[session.id] = el; }} className="absolute inset-0 w-0 h-0 opacity-0 pointer-events-none" onChange={(e) => e.target.value && onUpdateSessionDate(session.id, new Date(e.target.value).getTime())} />
                   </div>
                 )}
@@ -215,7 +227,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                              return (
                               <div key={t} className={`space-y-3 ${t === 2 ? 'text-right' : ''}`}>
                                 <div className={`flex justify-between items-center ${t === 2 ? 'flex-row-reverse' : ''}`}>
-                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">T{t} {m.status === 'COMPLETED' && renderStatusBadge(teamScore!, oppScore!)}</span>
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">T{t} {(m.status === 'COMPLETED' && teamScore !== undefined && oppScore !== undefined) && renderStatusBadge(teamScore, oppScore)}</span>
                                   <span className="text-[9px] font-black text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-100 shadow-sm">{getTeamPoints(teamIds)} PT</span>
                                 </div>
                                 <div className="space-y-2">
@@ -234,7 +246,7 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                                             <button onClick={() => onSelectPlayer(id)} className="text-[13px] font-black text-slate-800 hover:text-red-600 truncate transition-colors">
                                               {player?.name || '???'}
                                             </button>
-                                            {delta !== undefined && <span className={`text-[9px] font-black italic px-1.5 py-0.5 rounded ${delta >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>{delta >= 0 ? '+' : ''}{delta.toFixed(1)}</span>}
+                                            {(m.status === 'COMPLETED' && delta !== undefined) && <span className={`text-[9px] font-black italic px-1.5 py-0.5 rounded ${delta >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>{delta >= 0 ? '+' : ''}{delta.toFixed(1)}</span>}
                                           </>
                                         )}
                                       </div>
@@ -250,14 +262,28 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                           {m.status === 'COMPLETED' ? (
                             <div className="flex flex-col items-center">
                               <div className="bg-slate-900 text-white px-5 py-2 rounded-2xl font-black text-2xl italic tracking-tighter shadow-xl border-2 border-white">{m.team1.score} - {m.team2.score}</div>
-                              {isAdmin && <button onClick={() => onReopenMatch(session.id, round.id, m.id)} className="text-[9px] font-black uppercase text-slate-400 hover:text-red-600 mt-2 tracking-widest">Edit</button>}
+                              {isAdmin && <button onClick={() => onReopenMatch(session.id, round.id, m.id)} className="text-[9px] font-black uppercase text-slate-400 hover:text-red-600 mt-2 tracking-widest flex items-center gap-1"><IconEdit /> Edit</button>}
                             </div>
                           ) : (
                             <div className="flex gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
-                              <input type="number" placeholder="0" className="w-10 h-10 text-center font-black text-lg rounded-lg border-none bg-white shadow-inner" onChange={e => setMatchScores(p => ({ ...p, [m.id]: { ...(p[m.id] || { s1: '', s2: '' }), s1: e.target.value } }))} />
+                              <input 
+                                type="number" 
+                                placeholder="0" 
+                                className="w-10 h-10 text-center font-black text-lg rounded-lg border-none bg-white shadow-inner disabled:opacity-50" 
+                                disabled={!isAdmin}
+                                onChange={e => setMatchScores(p => ({ ...p, [m.id]: { ...(p[m.id] || { s1: '', s2: '' }), s1: e.target.value } }))} 
+                              />
                               <span className="flex items-center text-slate-300">-</span>
-                              <input type="number" placeholder="0" className="w-10 h-10 text-center font-black text-lg rounded-lg border-none bg-white shadow-inner" onChange={e => setMatchScores(p => ({ ...p, [m.id]: { ...(p[m.id] || { s1: '', s2: '' }), s2: e.target.value } }))} />
-                              <button onClick={() => { const sc = matchScores[m.id]; if(sc?.s1 && sc?.s2) onUpdateScore(session.id, round.id, m.id, parseInt(sc.s1), parseInt(sc.s2)); }} className="bg-red-600 text-white px-4 h-10 rounded-lg text-[10px] font-black uppercase">OK</button>
+                              <input 
+                                type="number" 
+                                placeholder="0" 
+                                className="w-10 h-10 text-center font-black text-lg rounded-lg border-none bg-white shadow-inner disabled:opacity-50" 
+                                disabled={!isAdmin}
+                                onChange={e => setMatchScores(p => ({ ...p, [m.id]: { ...(p[m.id] || { s1: '', s2: '' }), s2: e.target.value } }))} 
+                              />
+                              {isAdmin && (
+                                <button onClick={() => { const sc = matchScores[m.id]; if(sc?.s1 && sc?.s2) onUpdateScore(session.id, round.id, m.id, parseInt(sc.s1), parseInt(sc.s2)); }} className="bg-red-600 text-white px-4 h-10 rounded-lg text-[10px] font-black uppercase">OK</button>
+                              )}
                             </div>
                           )}
                         </div>
