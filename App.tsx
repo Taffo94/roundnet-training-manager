@@ -165,26 +165,49 @@ const App: React.FC = () => {
   const isAdmin = auth === 'admin';
   const tabs = isAdmin ? ['ranking', 'training', 'history', 'stats'] : ['ranking', 'history', 'stats'];
 
+  // Deterministica: ordina per punti (desc) poi nome (asc)
+  const sortRanking = (players: any[]) => {
+    return [...players].sort((a, b) => {
+      const scoreA = a.basePoints + a.matchPoints;
+      const scoreB = b.basePoints + b.matchPoints;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      return a.name.localeCompare(b.name);
+    });
+  };
+
   const rankingDeltas = useMemo(() => {
     if (!state || state.sessions.length === 0) return {};
     const archivedSessions = state.sessions.filter(s => s.status === 'ARCHIVED').sort((a, b) => b.date - a.date);
     if (archivedSessions.length === 0) return {};
+    
     const lastSession = archivedSessions[0];
     const deltas: Record<string, { points: number, rankChange: number }> = {};
-    const currentRanking = [...state.players].sort((a, b) => (b.basePoints + b.matchPoints) - (a.basePoints + a.matchPoints));
-    const prevPlayers = state.players.map(p => {
+    
+    // Solo i giocatori visibili partecipano al calcolo delle posizioni relative (rank)
+    const visiblePlayers = state.players.filter(p => !p.isHidden);
+    const currentRanking = sortRanking(visiblePlayers);
+    
+    const prevPlayers = visiblePlayers.map(p => {
       let sessionPoints = 0;
       lastSession.rounds.forEach(r => r.matches.forEach(m => {
-        if (m.status === 'COMPLETED' && m.individualDeltas && m.individualDeltas[p.id]) sessionPoints += m.individualDeltas[p.id];
+        if (m.status === 'COMPLETED' && m.individualDeltas && m.individualDeltas[p.id]) {
+          sessionPoints += m.individualDeltas[p.id];
+        }
       }));
       return { ...p, matchPoints: p.matchPoints - sessionPoints, sessionDelta: sessionPoints };
     });
-    const prevRanking = [...prevPlayers].sort((a, b) => (b.basePoints + b.matchPoints) - (a.basePoints + a.matchPoints));
-    state.players.forEach(p => {
+    
+    const prevRanking = sortRanking(prevPlayers);
+    
+    visiblePlayers.forEach(p => {
       const currentRank = currentRanking.findIndex(x => x.id === p.id) + 1;
       const prevRank = prevRanking.findIndex(x => x.id === p.id) + 1;
-      deltas[p.id] = { points: prevPlayers.find(x => x.id === p.id)?.sessionDelta || 0, rankChange: prevRank - currentRank };
+      deltas[p.id] = { 
+        points: prevPlayers.find(x => x.id === p.id)?.sessionDelta || 0, 
+        rankChange: currentRank === 0 || prevRank === 0 ? 0 : prevRank - currentRank 
+      };
     });
+    
     return deltas;
   }, [state?.players, state?.sessions]);
 

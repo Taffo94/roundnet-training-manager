@@ -67,19 +67,22 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
     const findTop = (data: Record<string, any>, criteria: (id: string, d: any) => number) => {
       let topId = '';
       let topVal = -1;
-      const entries = Object.entries(data).sort(([idA], [idB]) => {
-         const nameA = players.find(p => p.id === idA)?.name || '';
-         const nameB = players.find(p => p.id === idB)?.name || '';
-         return nameA.localeCompare(nameB);
+      
+      // Ordinamento alfabetico per stabilità in caso di parità
+      const sortedKeys = Object.keys(data).sort((a, b) => {
+        const nameA = players.find(p => p.id === a)?.name || '';
+        const nameB = players.find(p => p.id === b)?.name || '';
+        return nameA.localeCompare(nameB);
       });
 
-      entries.forEach(([id, d]) => {
-        const val = criteria(id, d);
+      sortedKeys.forEach(id => {
+        const val = criteria(id, data[id]);
         if (val > topVal) {
           topVal = val;
           topId = id;
         }
       });
+      
       const player = players.find(p => p.id === topId);
       return player ? { ...player, ...data[topId], val: topVal } : null;
     };
@@ -99,7 +102,7 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
         wins: findTop(partnerStats, (_, d) => d.wins),
         wr: findTop(partnerStats, (_, d) => d.wins / d.total),
         freq: findTop(partnerStats, (_, d) => d.total),
-        worst: findTop(partnerStats, (_, d) => d.losses)
+        unlucky: findTop(partnerStats, (_, d) => d.losses)
       },
       opponents: {
         losses: findTop(opponentStats, (_, d) => d.losses),
@@ -186,7 +189,7 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
               <StatCard title="Compagno Vincente" player={stats.partners.wins} subtitle={`${stats.partners.wins?.wins || 0} Vittorie insieme`} icon="🤝" color="bg-green-50 text-green-600" help="Il giocatore con cui hai ottenuto il maggior numero assoluto di vittorie." />
               <StatCard title="Affinità Tecnica" player={stats.partners.wr} subtitle={`${((stats.partners.wr?.wins / stats.partners.wr?.total) * 100 || 0).toFixed(0)}% Win Rate`} icon="📈" color="bg-blue-50 text-blue-600" help="Il compagno con cui hai la percentuale di vittoria più alta (minimo 1 partita)." />
               <StatCard title="Partner Fedele" player={stats.partners.freq} subtitle={`${stats.partners.freq?.total || 0} Partite giocate`} icon="🔄" color="bg-slate-100 text-slate-600" help="Il giocatore con cui sei stato accoppiato più spesso." />
-              <StatCard title="Compagno Sfortunato" player={stats.partners.worst} subtitle={`${stats.partners.worst?.losses || 0} Sconfitte insieme`} icon="📉" color="bg-red-50 text-red-400" help="Il partner con cui hai subito il maggior numero di sconfitte totali." />
+              <StatCard title="Compagno Sfortunato" player={stats.partners.unlucky} subtitle={`${stats.partners.unlucky?.losses || 0} Sconfitte insieme`} icon="📉" color="bg-red-50 text-red-400" help="Il partner con cui hai subito il maggior numero di sconfitte totali." />
             </div>
           </div>
           <div className="space-y-4">
@@ -195,7 +198,7 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
               <StatCard title="Bestia Nera" player={stats.opponents.losses} subtitle={`Ti ha battuto ${stats.opponents.losses?.losses || 0} volte`} icon="🔥" color="bg-red-50 text-red-600" help="L'avversario che ti ha inflitto il maggior numero di sconfitte." />
               <StatCard title="Incubo" player={stats.opponents.lr} subtitle={`${((stats.opponents.lr?.losses / stats.opponents.lr?.total) * 100 || 0).toFixed(0)}% Sconfitte`} icon="💀" color="bg-orange-50 text-orange-600" help="L'avversario contro cui hai la percentuale di sconfitta più alta." />
               <StatCard title="Rivale Storico" player={stats.opponents.freq} subtitle={`${stats.opponents.freq?.total || 0} Scontri diretti`} icon="⚔️" color="bg-slate-100 text-slate-600" help="L'avversario che hai affrontato più volte in assoluto." />
-              <StatCard title="Vittima Preferita" player={stats.opponents.victim} subtitle={`Lo hai battuto ${stats.opponents.victim?.wins || 0} volte`} icon="🎯" color="bg-green-100 text-green-700" help="L'avversario contro cui hai ottenuto il maggior numero di vittorie in valore assoluto." />
+              <StatCard title="Vittima Preferita" player={stats.opponents.victim} subtitle={`${stats.opponents.victim?.wins || 0} Vittorie contro`} icon="🎯" color="bg-green-100 text-green-700" help="L'avversario contro cui hai ottenuto il maggior numero assoluto di vittorie." />
             </div>
           </div>
           <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">

@@ -41,21 +41,21 @@ const PlayerList: React.FC<PlayerListProps> = ({
   const [newPlayerData, setNewPlayerData] = useState({ name: '', gender: 'M' as Gender, basePoints: 1000 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Ordinamento deterministico stabile: punti (desc) -> nome (asc)
+  const deterministicSort = (a: Player, b: Player) => {
+    const scoreA = a.basePoints + a.matchPoints;
+    const scoreB = b.basePoints + b.matchPoints;
+    if (scoreB !== scoreA) return scoreB - scoreA;
+    return a.name.localeCompare(b.name);
+  };
+
   const visiblePlayers = isAdmin 
     ? [...players].sort((a, b) => {
         if (a.isHidden && !b.isHidden) return 1;
         if (!a.isHidden && b.isHidden) return -1;
-        const scoreA = a.basePoints + a.matchPoints;
-        const scoreB = b.basePoints + b.matchPoints;
-        if (scoreB !== scoreA) return scoreB - scoreA;
-        return a.name.localeCompare(b.name);
+        return deterministicSort(a, b);
       })
-    : [...players].filter(p => !p.isHidden).sort((a, b) => {
-        const scoreA = a.basePoints + a.matchPoints;
-        const scoreB = b.basePoints + b.matchPoints;
-        if (scoreB !== scoreA) return scoreB - scoreA;
-        return a.name.localeCompare(b.name);
-      });
+    : [...players].filter(p => !p.isHidden).sort(deterministicSort);
 
   const handleStartEdit = (player: Player) => {
     setEditingId(player.id);
