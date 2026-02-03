@@ -30,6 +30,10 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
   const dateInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const getPlayer = (id: string) => players.find(p => p.id === id);
+  const getPlayerName = (id: string) => {
+    const p = getPlayer(id);
+    return p ? (p.nickname || p.name) : '---';
+  };
 
   const getTeamPoints = (ids: string[]) => {
     const total = ids.reduce((acc, id) => {
@@ -68,10 +72,10 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
       round.matches.forEach(match => {
         data.push([
           round.roundNumber,
-          getPlayer(match.team1.playerIds[0])?.name || '---',
-          getPlayer(match.team1.playerIds[1])?.name || '---',
-          getPlayer(match.team2.playerIds[0])?.name || '---',
-          getPlayer(match.team2.playerIds[1])?.name || '---',
+          getPlayerName(match.team1.playerIds[0]),
+          getPlayerName(match.team1.playerIds[1]),
+          getPlayerName(match.team2.playerIds[0]),
+          getPlayerName(match.team2.playerIds[1]),
           match.status === 'COMPLETED' ? match.team1.score : '',
           match.status === 'COMPLETED' ? match.team2.score : '',
           round.mode.replace('_', ' ')
@@ -125,9 +129,9 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
               const separator = (s1 !== '' && s2 !== '') ? ' - ' : '';
               return `
                 <div style="display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #f1f5f9;">
-                  <div style="flex: 1; font-weight: 700;">${getPlayer(m.team1.playerIds[0])?.name || ''} / ${getPlayer(m.team1.playerIds[1])?.name || ''}</div>
+                  <div style="flex: 1; font-weight: 700;">${getPlayerName(m.team1.playerIds[0])} / ${getPlayerName(m.team1.playerIds[1])}</div>
                   <div style="background: #f1f5f9; padding: 5px 15px; border-radius: 8px; font-weight: 900; margin: 0 20px; min-width: 40px; text-align: center;">${s1}${separator}${s2}</div>
-                  <div style="flex: 1; text-align: right; font-weight: 700;">${getPlayer(m.team2.playerIds[0])?.name || ''} / ${getPlayer(m.team2.playerIds[1])?.name || ''}</div>
+                  <div style="flex: 1; text-align: right; font-weight: 700;">${getPlayerName(m.team2.playerIds[0])} / ${getPlayerName(m.team2.playerIds[1])}</div>
                 </div>
               `;
             }).join('')}
@@ -234,18 +238,19 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                                 <div className="space-y-2">
                                   {teamIds.map((id, idx) => {
                                     const player = getPlayer(id);
+                                    const displayName = player ? (player.nickname || player.name) : '???';
                                     const delta = m.individualDeltas?.[id];
                                     return (
                                       <div key={idx} className={`flex items-center gap-2 w-full ${t === 2 ? 'justify-end' : ''}`}>
                                         {isAdmin && m.status === 'PENDING' ? (
                                           <select value={id} onChange={(e) => onUpdatePlayers(session.id, round.id, m.id, t as 1|2, idx as 0|1, e.target.value)} className="text-[11px] font-bold p-1 bg-white border rounded-lg outline-none w-full">
                                             <option value="">Scegli...</option>
-                                            {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                            {participants.map(p => <option key={p.id} value={p.id}>{p.nickname || p.name}</option>)}
                                           </select>
                                         ) : (
                                           <>
                                             <button onClick={() => onSelectPlayer(id)} className="text-[13px] font-black text-slate-800 hover:text-red-600 truncate transition-colors">
-                                              {player?.name || '???'}
+                                              {displayName}
                                             </button>
                                             {(m.status === 'COMPLETED' && delta !== undefined) && <span className={`text-[9px] font-black italic px-1.5 py-0.5 rounded ${delta >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>{delta >= 0 ? '+' : ''}{delta.toFixed(1)}</span>}
                                           </>

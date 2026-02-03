@@ -20,7 +20,6 @@ export const loadFullState = async (): Promise<{players: Player[], sessions: Tra
     return local ? JSON.parse(local) : { players: [], sessions: [] };
   }
 
-  // Carichiamo i dati in parallelo dalle due tabelle
   const [playersRes, sessionsRes] = await Promise.all([
     supabase.from('players').select('*'),
     supabase.from('sessions').select('*').order('date', { ascending: false })
@@ -32,6 +31,7 @@ export const loadFullState = async (): Promise<{players: Player[], sessions: Tra
   const players: Player[] = (playersRes.data || []).map(p => ({
     id: p.id,
     name: p.name,
+    nickname: p.nickname, // Mapping nuovo campo
     gender: p.gender,
     basePoints: p.base_points,
     matchPoints: p.match_points,
@@ -52,14 +52,13 @@ export const loadFullState = async (): Promise<{players: Player[], sessions: Tra
   return { players, sessions };
 };
 
-// Salvataggio granulare: salviamo solo quello che serve
 export const savePlayersToDB = async (players: Player[]) => {
   if (!supabase) return;
   
-  // Mappiamo i dati per il DB (snake_case)
   const dbData = players.map(p => ({
     id: p.id,
     name: p.name,
+    nickname: p.nickname, // Mapping nuovo campo
     gender: p.gender,
     base_points: p.basePoints,
     match_points: p.matchPoints,
@@ -99,7 +98,6 @@ export const deleteSessionFromDB = async (id: string) => {
   if (error) throw error;
 };
 
-// Backup locale per sicurezza estrema
 export const saveLocalBackup = (players: Player[], sessions: TrainingSession[]) => {
   localStorage.setItem(LOCAL_STORAGE_BACKUP_KEY, JSON.stringify({ players, sessions }));
 };

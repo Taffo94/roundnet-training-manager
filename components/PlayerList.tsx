@@ -6,8 +6,8 @@ interface PlayerListProps {
   players: Player[];
   deltas: Record<string, { points: number, rankChange: number }>;
   isAdmin: boolean;
-  onAddPlayer: (name: string, gender: Gender, basePoints: number) => void;
-  onUpdatePlayer: (id: string, name: string, gender: Gender, basePoints: number, matchPoints: number) => void;
+  onAddPlayer: (name: string, nickname: string, gender: Gender, basePoints: number) => void;
+  onUpdatePlayer: (id: string, name: string, nickname: string, gender: Gender, basePoints: number, matchPoints: number) => void;
   onDeletePlayer: (id: string) => void;
   onSelectPlayer: (id: string) => void;
   onResetPoints: () => void;
@@ -21,7 +21,7 @@ const IconEdit = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height
 const IconDelete = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>;
 const IconHide = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
 const IconShow = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
-const IconSave = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>;
+const IconSave = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1-2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>;
 
 const InfoTooltip = ({ text, position = 'bottom' }: { text: string, position?: 'top' | 'bottom' }) => (
   <span className="ml-1 cursor-help group relative inline-block align-middle">
@@ -37,11 +37,10 @@ const PlayerList: React.FC<PlayerListProps> = ({
   players, deltas, isAdmin, onAddPlayer, onUpdatePlayer, onDeletePlayer, onSelectPlayer, onResetPoints, onRecalculate, onToggleHidden, onExport, onImport 
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState<{name: string, gender: Gender, basePoints: number, matchPoints: number} | null>(null);
-  const [newPlayerData, setNewPlayerData] = useState({ name: '', gender: 'M' as Gender, basePoints: 1000 });
+  const [editFormData, setEditFormData] = useState<{name: string, nickname: string, gender: Gender, basePoints: number, matchPoints: number} | null>(null);
+  const [newPlayerData, setNewPlayerData] = useState({ name: '', nickname: '', gender: 'M' as Gender, basePoints: 1000 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Ordinamento deterministico stabile: punti (desc) -> nome (asc)
   const deterministicSort = (a: Player, b: Player) => {
     const scoreA = a.basePoints + a.matchPoints;
     const scoreB = b.basePoints + b.matchPoints;
@@ -59,12 +58,18 @@ const PlayerList: React.FC<PlayerListProps> = ({
 
   const handleStartEdit = (player: Player) => {
     setEditingId(player.id);
-    setEditFormData({ name: player.name, gender: player.gender, basePoints: player.basePoints, matchPoints: player.matchPoints });
+    setEditFormData({ 
+      name: player.name, 
+      nickname: player.nickname || '', 
+      gender: player.gender, 
+      basePoints: player.basePoints, 
+      matchPoints: player.matchPoints 
+    });
   };
 
   const handleSaveEdit = (id: string) => {
     if (editFormData) {
-      onUpdatePlayer(id, editFormData.name, editFormData.gender, editFormData.basePoints, editFormData.matchPoints);
+      onUpdatePlayer(id, editFormData.name, editFormData.nickname, editFormData.gender, editFormData.basePoints, editFormData.matchPoints);
       setEditingId(null);
       setEditFormData(null);
     }
@@ -90,10 +95,14 @@ const PlayerList: React.FC<PlayerListProps> = ({
       {isAdmin && (
         <div className="p-8 bg-white border-b border-slate-100">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6">Aggiungi Nuovo Atleta</h3>
-          <form onSubmit={(e) => { e.preventDefault(); if(!newPlayerData.name) return; onAddPlayer(newPlayerData.name, newPlayerData.gender, newPlayerData.basePoints); setNewPlayerData({ name: '', gender: 'M', basePoints: 1000 }); }} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <form onSubmit={(e) => { e.preventDefault(); if(!newPlayerData.name) return; onAddPlayer(newPlayerData.name, newPlayerData.nickname, newPlayerData.gender, newPlayerData.basePoints); setNewPlayerData({ name: '', nickname: '', gender: 'M', basePoints: 1000 }); }} className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="flex flex-col gap-1">
               <label className="text-[8px] font-black uppercase text-slate-400 px-1">Nome Cognome</label>
               <input type="text" placeholder="Es: Mario Rossi" value={newPlayerData.name} onChange={e => setNewPlayerData({...newPlayerData, name: e.target.value})} className="p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-500 font-bold text-sm" required />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[8px] font-black uppercase text-slate-400 px-1">Soprannome (Opt)</label>
+              <input type="text" placeholder="Es: Il Toro" value={newPlayerData.nickname} onChange={e => setNewPlayerData({...newPlayerData, nickname: e.target.value})} className="p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-red-500 font-bold text-sm" />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[8px] font-black uppercase text-slate-400 px-1">Sesso</label>
@@ -122,11 +131,11 @@ const PlayerList: React.FC<PlayerListProps> = ({
               <th className="px-6 py-4 text-center">Sesso</th>
               {isAdmin && (
                 <th className="px-6 py-4 text-center whitespace-nowrap">
-                  Match Points <InfoTooltip text="Punti accumulati esclusivamente giocando partite durante gli allenamenti." />
+                  Match Points <InfoTooltip text="Punti accumulati giocando durante gli allenamenti." />
                 </th>
               )}
               <th className="px-6 py-4 text-center text-red-600 font-black italic whitespace-nowrap">
-                Totale <InfoTooltip text="Somma tra Punti Base (fissi) e Match Points (dinamici)." />
+                Totale <InfoTooltip text="Somma tra Punti Base e Match Points." />
               </th>
               <th className="px-6 py-4 text-center whitespace-nowrap">
                 V / S <InfoTooltip text="Rapporto tra Vittorie e Sconfitte totali." />
@@ -138,15 +147,23 @@ const PlayerList: React.FC<PlayerListProps> = ({
             {visiblePlayers.map((player, index) => {
               const d = deltas[player.id];
               const isEditing = editingId === player.id;
+              const displayName = player.nickname || player.name;
+              
               return (
                 <tr key={player.id} className={`hover:bg-slate-50 transition-colors group ${player.isHidden ? 'opacity-50' : ''}`}>
                   <td className="px-6 py-5 font-black text-slate-300 italic text-lg">#{index + 1}</td>
                   <td className="px-6 py-5">
                     {isEditing ? (
-                      <input type="text" value={editFormData?.name} onChange={e => setEditFormData(prev => prev ? {...prev, name: e.target.value} : null)} className="p-2 border border-slate-200 rounded-lg font-bold text-sm w-full outline-none focus:border-red-500" />
+                      <div className="flex flex-col gap-2">
+                        <input type="text" placeholder="Nome Completo" value={editFormData?.name} onChange={e => setEditFormData(prev => prev ? {...prev, name: e.target.value} : null)} className="p-2 border border-slate-200 rounded-lg font-bold text-sm w-full outline-none focus:border-red-500" />
+                        <input type="text" placeholder="Soprannome (opzionale)" value={editFormData?.nickname} onChange={e => setEditFormData(prev => prev ? {...prev, nickname: e.target.value} : null)} className="p-2 border border-slate-200 rounded-lg font-bold text-xs w-full outline-none focus:border-red-500" />
+                      </div>
                     ) : (
                       <div className="flex items-center gap-3">
-                        <button onClick={() => onSelectPlayer(player.id)} className="font-black text-slate-800 hover:text-red-600 transition-all underline decoration-slate-100 underline-offset-8 decoration-2">{player.name}</button>
+                        <button onClick={() => onSelectPlayer(player.id)} className="font-black text-slate-800 hover:text-red-600 transition-all underline decoration-slate-100 underline-offset-8 decoration-2 flex flex-col items-start">
+                          <span>{displayName}</span>
+                          {player.nickname && <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter italic">({player.name})</span>}
+                        </button>
                         {d && d.rankChange !== 0 && !player.isHidden && (
                           <div className={`flex items-center gap-0.5 text-[10px] font-black px-1.5 py-0.5 rounded-full ${d.rankChange > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                             <span>{d.rankChange > 0 ? '▲' : '▼'}</span>

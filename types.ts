@@ -5,13 +5,14 @@ export type AuthMode = 'admin' | 'user' | null;
 export interface Player {
   id: string;
   name: string;
+  nickname?: string; // Campo opzionale per il soprannome
   gender: Gender;
   wins: number;
   losses: number;
-  basePoints: number; // Punti assegnati manualmente
-  matchPoints: number; // Punti derivanti dalle partite
+  basePoints: number; 
+  matchPoints: number; 
   lastActive: number;
-  isHidden?: boolean; // Se true, il giocatore è nascosto dalla classifica per gli utenti normali
+  isHidden?: boolean; 
 }
 
 export enum MatchmakingMode {
@@ -34,8 +35,8 @@ export interface Match {
   status: 'PENDING' | 'COMPLETED';
   mode: MatchmakingMode;
   createdAt: number;
-  pointsDelta?: number; // Delta medio del team vincitore
-  individualDeltas?: Record<string, number>; // Delta specifico per ogni ID giocatore
+  pointsDelta?: number; 
+  individualDeltas?: Record<string, number>; 
 }
 
 export interface Round {

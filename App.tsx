@@ -165,7 +165,7 @@ const App: React.FC = () => {
   const isAdmin = auth === 'admin';
   const tabs = isAdmin ? ['ranking', 'training', 'history', 'stats'] : ['ranking', 'history', 'stats'];
 
-  // Deterministica: ordina per punti (desc) poi nome (asc)
+  // Ordinamento deterministico stabile: punti (desc) -> nome (asc)
   const sortRanking = (players: any[]) => {
     return [...players].sort((a, b) => {
       const scoreA = a.basePoints + a.matchPoints;
@@ -183,7 +183,6 @@ const App: React.FC = () => {
     const lastSession = archivedSessions[0];
     const deltas: Record<string, { points: number, rankChange: number }> = {};
     
-    // Solo i giocatori visibili partecipano al calcolo delle posizioni relative (rank)
     const visiblePlayers = state.players.filter(p => !p.isHidden);
     const currentRanking = sortRanking(visiblePlayers);
     
@@ -272,8 +271,8 @@ const App: React.FC = () => {
         {state.currentTab === 'ranking' && (
           <PlayerList 
             players={state.players} deltas={rankingDeltas} isAdmin={isAdmin}
-            onAddPlayer={(n, g, b) => setState(p => p ? ({ ...p, players: [...p.players, { id: Math.random().toString(36).substr(2, 9), name: n, gender: g, wins: 0, losses: 0, basePoints: b, matchPoints: 0, lastActive: Date.now() }] }) : null)} 
-            onUpdatePlayer={(id, n, g, b, m) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, name: n, gender: g, basePoints: b, matchPoints: m } : x) }) : null)} 
+            onAddPlayer={(n, ni, g, b) => setState(p => p ? ({ ...p, players: [...p.players, { id: Math.random().toString(36).substr(2, 9), name: n, nickname: ni, gender: g, wins: 0, losses: 0, basePoints: b, matchPoints: 0, lastActive: Date.now() }] }) : null)} 
+            onUpdatePlayer={(id, n, ni, g, b, m) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, name: n, nickname: ni, gender: g, basePoints: b, matchPoints: m } : x) }) : null)} 
             onDeletePlayer={(id) => { if(window.confirm("Eliminare definitivamente l'atleta?")) { deletePlayerFromDB(id); setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null); } }} 
             onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
             onResetPoints={() => {}} onRecalculate={recalculateAllPoints}

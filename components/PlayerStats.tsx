@@ -59,8 +59,8 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
       opponentTeam.playerIds.forEach(oppId => {
         if (!opponentStats[oppId]) opponentStats[oppId] = { wins: 0, total: 0, losses: 0 };
         opponentStats[oppId].total++;
-        if (won) opponentStats[oppId].wins++; // Io ho vinto contro di lui
-        if (lost) opponentStats[oppId].losses++; // Io ho perso contro di lui
+        if (won) opponentStats[oppId].wins++; 
+        if (lost) opponentStats[oppId].losses++; 
       });
     });
 
@@ -68,7 +68,6 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
       let topId = '';
       let topVal = -1;
       
-      // Ordinamento alfabetico per stabilità in caso di parità
       const sortedKeys = Object.keys(data).sort((a, b) => {
         const nameA = players.find(p => p.id === a)?.name || '';
         const nameB = players.find(p => p.id === b)?.name || '';
@@ -129,7 +128,7 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
               onClick={() => onSelectPlayer(player.id)}
               className="font-black text-slate-800 hover:text-red-600 transition-colors block mb-1 text-left"
             >
-              {player.name}
+              {player.nickname || player.name}
             </button>
             <div className="text-[11px] font-bold text-slate-500 uppercase">{subtitle}</div>
           </div>
@@ -150,8 +149,8 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
           className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-black text-slate-800 focus:ring-4 focus:ring-red-500/10 focus:border-red-500 outline-none transition-all"
         >
           <option value="">Scegli un giocatore...</option>
-          {players.sort((a,b) => a.name.localeCompare(b.name)).map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
+          {players.sort((a,b) => (a.nickname || a.name).localeCompare(b.nickname || b.name)).map(p => (
+            <option key={p.id} value={p.id}>{p.nickname || p.name}</option>
           ))}
         </select>
       </div>
@@ -163,12 +162,13 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
                 <svg viewBox="0 0 100 100" className="w-32 h-32 fill-white"><circle cx="50" cy="50" r="40"/></svg>
              </div>
              <div className="relative z-10 text-center md:text-left">
-                <h2 className="text-4xl font-black italic uppercase tracking-tighter mb-1">{selectedPlayer.name}</h2>
+                <h2 className="text-4xl font-black italic uppercase tracking-tighter mb-1">{selectedPlayer.nickname || selectedPlayer.name}</h2>
                 <div className="flex gap-4 text-xs font-bold uppercase tracking-widest text-slate-400 justify-center md:justify-start">
                    <span>{selectedPlayer.gender === 'M' ? 'Uomo' : 'Donna'}</span>
                    <span>•</span>
                    <span>{Math.round(selectedPlayer.basePoints + selectedPlayer.matchPoints)} Punti Ranking</span>
                 </div>
+                {selectedPlayer.nickname && <div className="text-[10px] text-slate-500 font-bold uppercase mt-1 italic">Nome reale: {selectedPlayer.name}</div>}
              </div>
              <div className="flex gap-12 text-center relative z-10">
                 <div className="group relative">
@@ -213,6 +213,7 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
                 const won = (myTeam.score || 0) > (oppTeam.score || 0);
                 const tied = myTeam.score !== undefined && oppTeam.score !== undefined && myTeam.score === oppTeam.score;
                 const partnerId = myTeam.playerIds.find(id => id !== selectedPlayerId);
+                const partner = players.find(p => p.id === partnerId);
                 return (
                   <div key={match.id} className="px-8 py-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
                     <div className="flex items-center gap-6">
@@ -223,17 +224,20 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({ players, sessions, selectedPl
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-[10px] font-black text-slate-400 uppercase">Partner:</span>
                           <button onClick={() => onSelectPlayer(partnerId!)} className="text-sm font-bold text-slate-800 hover:text-red-600 transition-colors underline decoration-slate-200">
-                            {players.find(p => p.id === partnerId)?.name}
+                            {partner ? (partner.nickname || partner.name) : '---'}
                           </button>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-black text-slate-400 uppercase">vs:</span>
                           <div className="flex gap-2">
-                             {oppTeam.playerIds.map(id => (
-                               <button key={id} onClick={() => onSelectPlayer(id)} className="text-[11px] font-medium text-slate-500 hover:text-red-600">
-                                 {players.find(p => p.id === id)?.name}
-                               </button>
-                             ))}
+                             {oppTeam.playerIds.map(id => {
+                               const opp = players.find(p => p.id === id);
+                               return (
+                                 <button key={id} onClick={() => onSelectPlayer(id)} className="text-[11px] font-medium text-slate-500 hover:text-red-600">
+                                   {opp ? (opp.nickname || opp.name) : '---'}
+                                 </button>
+                               );
+                             })}
                           </div>
                         </div>
                       </div>

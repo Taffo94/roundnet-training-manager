@@ -116,10 +116,11 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {sortedByAttendance.map(p => {
             const att = attendanceMap[p.id] || 0;
+            const displayName = p.nickname || p.name;
             return (
               <button key={p.id} onClick={() => togglePlayer(p.id)} className={`p-4 rounded-2xl border-2 text-sm font-bold transition-all text-left flex flex-col group ${selectedIds.includes(p.id) ? 'bg-red-600 border-red-600 text-white shadow-lg transform scale-105' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-red-300'}`}>
                 <div className="flex justify-between items-start w-full">
-                   <span className="truncate">{p.name}</span>
+                   <span className="truncate">{displayName}</span>
                    {att > 0 && <span className={`text-[8px] font-black px-1.5 rounded-full ${selectedIds.includes(p.id) ? 'bg-white/20' : 'bg-slate-200'}`}>{att}P</span>}
                 </div>
                 <span className={`text-[9px] font-black mt-1 uppercase tracking-widest ${selectedIds.includes(p.id) ? 'text-white/60' : 'text-slate-400'}`}>{p.gender} • {Math.round(p.basePoints + p.matchPoints)} PT</span>
@@ -254,6 +255,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                             <div className="space-y-2">
                               {teamIds.map((id, idx) => {
                                 const player = getPlayer(id);
+                                const displayName = player ? (player.nickname || player.name) : '???';
                                 const delta = m.individualDeltas?.[id];
                                 return (
                                   <div key={idx}>
@@ -264,7 +266,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                                         className={`text-[12px] font-bold p-2 bg-white border rounded-xl outline-none w-full shadow-sm ${conflicts.has(id) ? 'border-red-500 text-red-600 bg-red-50' : 'border-slate-200 focus:border-red-600'}`}
                                       >
                                         <option value="">Scegli...</option>
-                                        {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                        {participants.map(p => <option key={p.id} value={p.id}>{p.nickname || p.name}</option>)}
                                       </select>
                                     ) : (
                                       <div className={`flex items-center gap-2 w-full ${t === 2 ? 'justify-end' : ''}`}>
@@ -272,7 +274,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                                           onClick={() => onSelectPlayer(id)} 
                                           className={`text-[15px] font-black hover:text-red-600 truncate ${t === 2 ? 'text-right order-2' : 'text-left'} ${conflicts.has(id) ? 'text-red-600 underline decoration-red-500 decoration-2 underline-offset-4' : 'text-slate-800'}`}
                                         >
-                                          {player?.name || '???'}
+                                          {displayName}
                                         </button>
                                         {delta !== undefined && (
                                           <span className={`text-[9px] font-black italic px-1.5 py-0.5 rounded ${delta >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
@@ -325,7 +327,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                       <React.Fragment key={idx}>
                         {isRoundLocked ? (
                           <span className={`text-[13px] font-black px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm ${conflicts.has(id) ? 'text-red-600' : 'text-slate-700'}`}>
-                            {getPlayer(id)?.name || '???'}
+                            {getPlayer(id) ? (getPlayer(id)!.nickname || getPlayer(id)!.name) : '???'}
                           </span>
                         ) : (
                           <select 
@@ -333,7 +335,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                             onChange={(e) => onUpdateResting(session.id, round.id, idx, e.target.value)} 
                             className={`text-[11px] font-bold p-2 bg-white border rounded-xl outline-none shadow-sm ${conflicts.has(id) ? 'border-red-500 text-red-600 bg-red-50' : 'border-yellow-200 focus:border-yellow-500'}`}
                           >
-                            {participants.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            {participants.map(p => <option key={p.id} value={p.id}>{p.nickname || p.name}</option>)}
                           </select>
                         )}
                       </React.Fragment>
