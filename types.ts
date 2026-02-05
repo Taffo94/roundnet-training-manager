@@ -44,7 +44,7 @@ export interface AppSettings {
   showStatsToAthletes: boolean;
   adminUICompactMode: boolean;
   ranking: RankingSettings;
-  lastUpdated?: number; // Timestamp dell'ultima modifica
+  lastUpdated?: number; 
 }
 
 export interface AppSnapshot {
@@ -54,6 +54,7 @@ export interface AppSnapshot {
   data: {
     players: Player[];
     sessions: TrainingSession[];
+    settings: AppSettings; // Inclusione settings nel backup
   };
 }
 

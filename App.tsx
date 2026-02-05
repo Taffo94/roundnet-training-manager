@@ -288,9 +288,9 @@ const App: React.FC = () => {
             onUpdateSettings={(newSets) => setState(p => p ? ({ ...p, settings: newSets }) : null)}
             players={state.players}
             sessions={state.sessions}
-            onRestoreSnapshot={(players, sessions) => {
-              if (window.confirm("Attenzione: Ripristinando questo snapshot sovrascriverai i dati attuali. Procedere?")) {
-                setState(p => p ? ({ ...p, players, sessions, currentTab: 'ranking' }) : null);
+            onRestoreSnapshot={(players, sessions, settings) => {
+              if (window.confirm("Attenzione: Ripristinando questo snapshot sovrascriverai i dati attuali (giocatori, sessioni e parametri ranking). Procedere?")) {
+                setState(p => p ? ({ ...p, players, sessions, settings, currentTab: 'ranking' }) : null);
               }
             }}
             onRecalculateGlobal={recalculateAllPoints}

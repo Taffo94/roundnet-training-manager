@@ -41,7 +41,6 @@ export const loadSettings = async (): Promise<AppSettings> => {
   if (error || !data) return defaultSettings;
   
   const saved = data.settings;
-  // Convertiamo il timestamp di database in formato compatibile con lastUpdated se necessario
   const lastUpdated = data.updated_at ? new Date(data.updated_at).getTime() : undefined;
 
   return {
@@ -105,11 +104,11 @@ export const loadFullState = async (): Promise<{players: Player[], sessions: Tra
   return { players, sessions };
 };
 
-export const createSnapshot = async (players: Player[], sessions: TrainingSession[], reason: string) => {
+export const createSnapshot = async (players: Player[], sessions: TrainingSession[], settings: AppSettings, reason: string) => {
   if (!supabase) return;
   const { error } = await supabase.from('app_snapshots').insert({
     reason,
-    data: { players, sessions }
+    data: { players, sessions, settings }
   });
   if (error) throw error;
 };

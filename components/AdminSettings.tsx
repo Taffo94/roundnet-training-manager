@@ -9,24 +9,19 @@ interface AdminSettingsProps {
   onUpdateSettings: (settings: AppSettings) => void;
   players: Player[];
   sessions: TrainingSession[];
-  onRestoreSnapshot: (players: Player[], sessions: TrainingSession[]) => void;
+  onRestoreSnapshot: (players: Player[], sessions: TrainingSession[], settings: AppSettings) => void;
   onRecalculateGlobal?: () => void;
 }
 
 const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSettings, players, sessions, onRestoreSnapshot, onRecalculateGlobal }) => {
   const [snapshots, setSnapshots] = useState<Partial<AppSnapshot>[]>([]);
   const [isBackingUp, setIsBackingUp] = useState(false);
-  const [backupReason, setBackupReason] = useState('Manual Admin Backup');
-  const [selectedSnapshotData, setSelectedSnapshotData] = useState<AppSnapshot | null>(null);
+  const [backupReason, setBackupReason] = useState('Aggiornamento parametri');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // Stato Draft con parametri separati
   const [draftRanking, setDraftRanking] = useState<RankingSettings>(JSON.parse(JSON.stringify(settings.ranking)));
-  
-  // Tab attiva per l'editor draft
   const [activeDraftTab, setActiveDraftTab] = useState<'classic' | 'proportional'>('classic');
 
-  // Sandbox states
   const [sandboxRankT1, setSandboxRankT1] = useState(2000);
   const [sandboxRankT2, setSandboxRankT2] = useState(2000);
   const [sandboxScoreT1, setSandboxScoreT1] = useState(21);
@@ -46,10 +41,20 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
   const handleBackup = async () => {
     setIsBackingUp(true);
     try {
-      await createSnapshot(players, sessions, backupReason);
+      // Snapshot ora include players, sessions E settings correnti
+      await createSnapshot(players, sessions, settings, backupReason);
       await fetchSnapshots();
-      alert("Backup salvato.");
+      setBackupReason('Aggiornamento parametri');
     } finally { setIsBackingUp(false); }
+  };
+
+  const handleRestore = async (id: string) => {
+    try {
+      const snap = await getSnapshotContent(id);
+      if (snap) {
+        onRestoreSnapshot(snap.data.players, snap.data.sessions, snap.data.settings);
+      }
+    } catch (e) { alert("Errore nel ripristino."); }
   };
 
   const updateDraftParam = (mode: 'classic' | 'proportional', key: keyof RankingModeParams, value: any) => {
@@ -64,7 +69,6 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
   }, [draftRanking, settings.ranking]);
 
   const handleApplySettings = (recalculate: boolean) => {
-    // Aggiungiamo il timestamp di sistema al momento del salvataggio
     onUpdateSettings({ 
       ...settings, 
       ranking: draftRanking,
@@ -94,22 +98,57 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
 
   return (
     <div className="max-w-6xl mx-auto space-y-12 pb-20">
-      <div className="border-b border-slate-200 pb-6 flex justify-between items-end">
-        <div>
-          <h2 className="text-3xl font-black text-slate-800 uppercase italic tracking-tighter">Ranking Lab</h2>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Configurazione e Simulazione Motore ELO</p>
+      
+      {/* 1. SEZIONE PRIORITARIA: DATA INTEGRITY & SNAPSHOTS */}
+      <section className="bg-white rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden">
+        <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+           <div>
+              <h2 className="text-2xl font-black text-slate-800 uppercase italic tracking-tighter">Data Integrity & Snapshots</h2>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Gestione backup completi (Giocatori, Sessioni e Parametri)</p>
+           </div>
+           <div className="flex gap-4">
+              <input 
+                 type="text" 
+                 placeholder="Motivo backup..." 
+                 value={backupReason} 
+                 onChange={e => setBackupReason(e.target.value)}
+                 className="p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-red-500 w-48"
+              />
+              <button 
+                onClick={handleBackup} 
+                disabled={isBackingUp}
+                className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-black transition-all disabled:opacity-50"
+              >
+                {isBackingUp ? 'Creazione...' : 'Crea Snapshot Ora'}
+              </button>
+           </div>
         </div>
-        {isSettingsDirty && (
-          <button 
-            onClick={() => setShowConfirmModal(true)}
-            className="bg-red-600 text-white px-8 py-3 rounded-2xl font-black uppercase text-[11px] tracking-widest shadow-xl shadow-red-100 animate-pulse border-2 border-white"
-          >
-            Salva in Produzione
-          </button>
-        )}
-      </div>
 
-      {/* --- SEZIONE PRODUZIONE (LIVE) --- */}
+        <div className="p-10">
+           <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-6">Storico Snapshot Disponibili</div>
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {snapshots.map(s => (
+                <div key={s.id} className="p-6 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between hover:border-red-200 transition-colors group">
+                   <div>
+                      <div className="text-[8px] font-black text-slate-400 uppercase mb-1">{new Date(s.created_at!).toLocaleString()}</div>
+                      <div className="text-sm font-black text-slate-800 uppercase italic mb-4 leading-tight">{s.reason}</div>
+                   </div>
+                   <button 
+                      onClick={() => handleRestore(s.id!)}
+                      className="w-full py-2 bg-white border border-slate-200 rounded-xl text-[9px] font-black uppercase text-slate-500 group-hover:bg-red-600 group-hover:text-white group-hover:border-red-600 transition-all shadow-sm"
+                   >
+                      Ripristina Dati e Parametri
+                   </button>
+                </div>
+              ))}
+              {snapshots.length === 0 && (
+                <div className="col-span-full py-12 text-center text-slate-300 font-bold uppercase text-[10px] italic">Nessuno snapshot salvato.</div>
+              )}
+           </div>
+        </div>
+      </section>
+
+      {/* 2. SEZIONE RANKING: DASHBOARD LIVE */}
       <section className="bg-slate-900 rounded-[2rem] p-8 text-white shadow-2xl relative overflow-hidden ring-4 ring-slate-200">
         <div className="absolute top-0 right-0 p-8 opacity-10">
            <span className="text-8xl font-black italic">LIVE</span>
@@ -118,11 +157,11 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
            <div className="space-y-4">
               <div className="flex items-center gap-3">
                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]"></div>
-                 <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Attualmente in Produzione</h3>
+                 <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Motore Attivo</h3>
               </div>
               <div>
                 <div className="text-4xl font-black italic uppercase tracking-tighter text-red-500">{settings.ranking.mode} MODE</div>
-                <div className="text-[9px] font-bold text-slate-500 uppercase mt-1 tracking-widest">Ultimo salvataggio su database: <span className="text-white">{lastUpdatedStr}</span></div>
+                <div className="text-[9px] font-bold text-slate-500 uppercase mt-1 tracking-widest">Ultimo salvataggio: <span className="text-white">{lastUpdatedStr}</span></div>
               </div>
            </div>
 
@@ -145,12 +184,12 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
         </div>
       </section>
 
-      {/* --- EDITOR DRAFT SEPARATO --- */}
+      {/* 3. SEZIONE RANKING: EDITOR DRAFT */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
          <section className="lg:col-span-5 bg-white rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden flex flex-col">
             <div className="p-8 bg-slate-100 border-b border-slate-200">
                <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-black text-sm uppercase italic tracking-widest text-slate-800">Draft Editor</h3>
+                  <h3 className="font-black text-sm uppercase italic tracking-widest text-slate-800">Parametri Draft</h3>
                   <div className={`text-[8px] font-black px-2 py-1 rounded transition-colors ${isSettingsDirty ? 'bg-red-600 text-white' : 'bg-slate-300 text-slate-600'}`}>
                     {isSettingsDirty ? 'MODIFICHE NON SALVATE' : 'SINCRO CON PROD'}
                   </div>
@@ -224,14 +263,25 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
                   <div className="flex gap-2">
                      <button 
                         onClick={() => setDraftRanking(prev => ({ ...prev, mode: 'CLASSIC' }))}
-                        className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase transition-all ${draftRanking.mode === 'CLASSIC' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-100 text-slate-400'}`}
-                     >CLASSIC ACTIVE</button>
+                        className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase transition-all ${draftRanking.mode === 'CLASSIC' ? 'border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-200' : 'border-slate-100 text-slate-400'}`}
+                     >CLASSIC</button>
                      <button 
                         onClick={() => setDraftRanking(prev => ({ ...prev, mode: 'PROPORTIONAL' }))}
-                        className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase transition-all ${draftRanking.mode === 'PROPORTIONAL' ? 'border-red-600 bg-red-600 text-white shadow-lg shadow-red-50' : 'border-slate-100 text-slate-400'}`}
-                     >PROPORTIONAL ACTIVE</button>
+                        className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase transition-all ${draftRanking.mode === 'PROPORTIONAL' ? 'border-red-600 bg-red-600 text-white shadow-lg shadow-red-200' : 'border-slate-100 text-slate-400'}`}
+                     >PROPORTIONAL</button>
                   </div>
                </div>
+
+               {isSettingsDirty && (
+                 <div className="pt-4">
+                    <button 
+                        onClick={() => setShowConfirmModal(true)}
+                        className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest shadow-xl animate-pulse"
+                    >
+                        Applica Modifiche
+                    </button>
+                 </div>
+               )}
             </div>
          </section>
 
@@ -261,14 +311,14 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
             </div>
 
             <div className="grid grid-cols-2 gap-8">
-               <div className={`p-6 rounded-3xl border-2 transition-all relative ${draftRanking.mode === 'CLASSIC' ? 'border-slate-900 bg-white ring-4 ring-slate-100' : 'border-slate-100 opacity-40'}`}>
-                  {draftRanking.mode === 'CLASSIC' && <span className="absolute -top-3 left-6 bg-slate-900 text-white text-[7px] font-black px-2 py-1 rounded">PROD PREVIEW</span>}
+               <div className={`p-6 rounded-3xl border-2 transition-all relative ${draftRanking.mode === 'CLASSIC' ? 'border-slate-900 bg-white ring-4 ring-slate-100 shadow-xl shadow-slate-100' : 'border-slate-100 opacity-40'}`}>
+                  {draftRanking.mode === 'CLASSIC' && <span className="absolute -top-3 left-6 bg-slate-900 text-white text-[7px] font-black px-2 py-1 rounded">PREVIEW ATTIVA</span>}
                   <div className="text-[9px] font-black uppercase text-slate-400 mb-2">Classic Result</div>
                   <div className="text-3xl font-black text-slate-800">+{sandboxResults.classic.decimalDelta.toFixed(3)}</div>
                   <div className="text-[8px] font-bold text-slate-400 uppercase mt-2">K: {sandboxResults.classic.kUsed.toFixed(2)}</div>
                </div>
                <div className={`p-6 rounded-3xl border-2 transition-all relative ${draftRanking.mode === 'PROPORTIONAL' ? 'border-red-600 bg-white ring-4 ring-red-50 shadow-xl' : 'border-slate-100 opacity-40'}`}>
-                  {draftRanking.mode === 'PROPORTIONAL' && <span className="absolute -top-3 left-6 bg-red-600 text-white text-[7px] font-black px-2 py-1 rounded">PROD PREVIEW</span>}
+                  {draftRanking.mode === 'PROPORTIONAL' && <span className="absolute -top-3 left-6 bg-red-600 text-white text-[7px] font-black px-2 py-1 rounded">PREVIEW ATTIVA</span>}
                   <div className="text-[9px] font-black uppercase text-red-500 mb-2">Proportional Result</div>
                   <div className="text-3xl font-black text-red-600">+{sandboxResults.proportional.decimalDelta.toFixed(3)}</div>
                   <div className="text-[8px] font-bold text-red-400 uppercase mt-2">K: {sandboxResults.proportional.kUsed.toFixed(2)}</div>
@@ -305,25 +355,25 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
            <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl p-12 text-center space-y-8 animate-in zoom-in-95 duration-300">
               <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto text-3xl shadow-inner italic font-black">!</div>
               <div>
-                 <h4 className="text-2xl font-black text-slate-800 uppercase italic tracking-tighter">Pubblicazione Ranking</h4>
-                 <p className="text-slate-400 text-xs font-bold uppercase mt-2">Stai per sovrascrivere i parametri di produzione</p>
+                 <h4 className="text-2xl font-black text-slate-800 uppercase italic tracking-tighter text-red-600">Applica Parametri</h4>
+                 <p className="text-slate-400 text-xs font-bold uppercase mt-2">I nuovi parametri verranno salvati nel database</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-200 text-left">
                  <div className="space-y-1">
-                    <span className="text-[8px] font-black text-slate-400 uppercase">Nuova Modalità</span>
-                    <div className="text-sm font-black text-red-600 uppercase italic">{draftRanking.mode}</div>
+                    <span className="text-[8px] font-black text-slate-400 uppercase">Modalità</span>
+                    <div className="text-sm font-black text-slate-800 uppercase italic">{draftRanking.mode}</div>
                  </div>
                  <div className="space-y-1">
-                    <span className="text-[8px] font-black text-slate-400 uppercase">K-Base (Attivo)</span>
+                    <span className="text-[8px] font-black text-slate-400 uppercase">K-Base</span>
                     <div className="text-sm font-black text-slate-800">{draftRanking[draftRanking.mode === 'CLASSIC' ? 'classic' : 'proportional'].kBase}</div>
                  </div>
               </div>
 
               <div className="space-y-3">
-                 <button onClick={() => handleApplySettings(true)} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-red-100 hover:bg-red-700 transition-all">Applica e Ricalcola Storico</button>
-                 <button onClick={() => handleApplySettings(false)} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-black transition-all">Applica solo match futuri</button>
-                 <button onClick={() => setShowConfirmModal(false)} className="w-full py-2 text-slate-400 font-black uppercase text-[10px] tracking-widest">Torna al laboratorio</button>
+                 <button onClick={() => handleApplySettings(true)} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-red-100 hover:bg-red-700 transition-all">Salva e Ricalcola Tutto</button>
+                 <button onClick={() => handleApplySettings(false)} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-black transition-all">Salva (Match futuri)</button>
+                 <button onClick={() => setShowConfirmModal(false)} className="w-full py-2 text-slate-400 font-black uppercase text-[10px] tracking-widest">Indietro</button>
               </div>
            </div>
         </div>
