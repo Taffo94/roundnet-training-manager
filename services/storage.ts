@@ -19,14 +19,27 @@ export const loadSettings = async (): Promise<AppSettings> => {
     activeMatchmakingModes: Object.values(MatchmakingMode),
     allowManualSessionCreation: true,
     showStatsToAthletes: true,
-    adminUICompactMode: false
+    adminUICompactMode: false,
+    ranking: {
+      mode: 'CLASSIC',
+      kBase: 12,
+      bonusFactor: 1.25,
+      maxPossibleMargin: 21,
+      classicBonusMargin: 7
+    }
   };
 
   if (!supabase) return defaultSettings;
 
   const { data, error } = await supabase.from('app_settings').select('settings').eq('id', 'main').single();
   if (error || !data) return defaultSettings;
-  return data.settings;
+  
+  // Merge con default per gestire nuove chiavi (migrazione)
+  return {
+    ...defaultSettings,
+    ...data.settings,
+    ranking: { ...defaultSettings.ranking, ...data.settings.ranking }
+  };
 };
 
 export const saveSettingsToDB = async (settings: AppSettings) => {

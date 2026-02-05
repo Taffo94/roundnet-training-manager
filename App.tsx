@@ -93,7 +93,7 @@ const App: React.FC = () => {
             const p1 = prev.players.find(p => p.id === m.team1.playerIds[0]), p2 = prev.players.find(p => p.id === m.team1.playerIds[1]);
             const p3 = prev.players.find(p => p.id === m.team2.playerIds[0]), p4 = prev.players.find(p => p.id === m.team2.playerIds[1]);
             if (!p1 || !p2 || !p3 || !p4) return m;
-            const result = calculateNewRatings(p1, p2, p3, p4, s1, s2);
+            const result = calculateNewRatings(p1, p2, p3, p4, s1, s2, prev.settings.ranking);
             playersToUpdate = result.players;
             return { ...m, status: 'COMPLETED' as const, team1: { ...m.team1, score: s1 }, team2: { ...m.team2, score: s2 }, pointsDelta: result.delta, individualDeltas: result.individualDeltas };
           })
@@ -123,7 +123,7 @@ const App: React.FC = () => {
             const p4 = updatedPlayers.find(p => p.id === match.team2.playerIds[1]);
 
             if (p1 && p2 && p3 && p4) {
-              const result = calculateNewRatings(p1, p2, p3, p4, match.team1.score, match.team2.score);
+              const result = calculateNewRatings(p1, p2, p3, p4, match.team1.score, match.team2.score, state.settings.ranking);
               updatedPlayers = updatedPlayers.map(p => result.players.find(up => up.id === p.id) || p);
             }
           }
@@ -265,6 +265,7 @@ const App: React.FC = () => {
             onEditParticipants={(ids) => activeSession && setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === activeSession.id ? { ...s, participantIds: ids } : s) }) : null)}
             onArchive={(id) => setState(p => p ? ({ ...p, sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' } : x), currentTab: 'history' }) : null)} 
             onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
+            settings={state.settings}
           />
         )}
         {state.currentTab === 'history' && (

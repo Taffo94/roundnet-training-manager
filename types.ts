@@ -23,11 +23,22 @@ export enum MatchmakingMode {
   CUSTOM = 'CUSTOM'
 }
 
+export type RankingMode = 'CLASSIC' | 'PROPORTIONAL';
+
+export interface RankingSettings {
+  mode: RankingMode;
+  kBase: number;
+  bonusFactor: number;
+  maxPossibleMargin: number; // Solo per Proportional
+  classicBonusMargin: number; // Solo per Classic
+}
+
 export interface AppSettings {
   activeMatchmakingModes: MatchmakingMode[];
   allowManualSessionCreation: boolean;
   showStatsToAthletes: boolean;
   adminUICompactMode: boolean;
+  ranking: RankingSettings;
 }
 
 export interface AppSnapshot {

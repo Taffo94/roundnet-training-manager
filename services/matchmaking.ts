@@ -1,4 +1,5 @@
-import { Player, Match, MatchmakingMode, Round } from '../types';
+
+import { Player, Match, MatchmakingMode, Round, RankingSettings } from '../types';
 
 const shuffle = <T,>(array: T[]): T[] => {
   const newArray = [...array];
@@ -9,7 +10,6 @@ const shuffle = <T,>(array: T[]): T[] => {
   return newArray;
 };
 
-// Funzione per contare quante volte due giocatori hanno fatto coppia nei round precedenti
 const getPartnershipCount = (p1Id: string, p2Id: string, previousRounds: Round[]): number => {
   let count = 0;
   previousRounds.forEach(r => {
@@ -41,14 +41,29 @@ const getExpectedScore = (playerElo: number, opponentsAvgElo: number): number =>
 export const calculateNewRatings = (
   p1: Player, p2: Player, 
   p3: Player, p4: Player, 
-  score1: number, score2: number
-): { players: Player[], delta: number, individualDeltas: Record<string, number> } => {
-  const K_BASE = 12;
-  const BONUS_FACTOR = 1.25;
-  const BONUS_MARGIN = 7;
+  score1: number, score2: number,
+  rankingSettings?: RankingSettings
+): { players: Player[], delta: number, individualDeltas: Record<string, number>, kUsed: number } => {
+  // Default fallback se settings non passati
+  const config = rankingSettings || {
+    mode: 'CLASSIC',
+    kBase: 12,
+    bonusFactor: 1.25,
+    maxPossibleMargin: 21,
+    classicBonusMargin: 7
+  };
 
   const margin = Math.abs(score1 - score2);
-  const kEff = margin >= BONUS_MARGIN ? K_BASE * BONUS_FACTOR : K_BASE;
+  let kEff = config.kBase;
+
+  if (config.mode === 'PROPORTIONAL') {
+    // kEff = K_BASE * (1 + (margin / maxPossibleMargin) * (BONUS_FACTOR - 1))
+    const ratio = Math.min(margin / config.maxPossibleMargin, 1);
+    kEff = config.kBase * (1 + ratio * (config.bonusFactor - 1));
+  } else {
+    // Modalità Classic (attuale)
+    kEff = margin >= config.classicBonusMargin ? config.kBase * config.bonusFactor : config.kBase;
+  }
 
   let resultS1 = 0.5;
   if (score1 > score2) resultS1 = 1.0;
@@ -81,6 +96,7 @@ export const calculateNewRatings = (
   };
 
   return {
+    kUsed: kEff,
     delta: Math.round(resultS1 >= 0.5 ? deltaP1 : deltaP3), 
     individualDeltas,
     players: [
@@ -125,73 +141,39 @@ export const generateRound = (
       matches.push(createMatch({id: ''}, {id: ''}, {id: ''}, {id: ''}, mode));
     }
   } else if (mode === MatchmakingMode.SAME_LEVEL) {
-    // Ordiniamo per livello
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
-    
     for (let i = 0; i < numMatches; i++) {
-      // Prendiamo i 4 atleti della stessa fascia di livello
       const block = playersToPair.splice(0, 4);
       const [p1, p2, p3, p4] = block;
-      
-      // Valutiamo le 3 possibili combinazioni di coppie nel blocco
-      // Opzione A: (p1, p2) vs (p3, p4)
-      // Opzione B: (p1, p3) vs (p2, p4)
-      // Opzione C: (p1, p4) vs (p2, p3)
-      
       const options = [
-        { 
-          t1: [p1, p2], t2: [p3, p4], 
-          history: getPartnershipCount(p1.id, p2.id, previousRounds) + getPartnershipCount(p3.id, p4.id, previousRounds) 
-        },
-        { 
-          t1: [p1, p3], t2: [p2, p4], 
-          history: getPartnershipCount(p1.id, p3.id, previousRounds) + getPartnershipCount(p2.id, p4.id, previousRounds) 
-        },
-        { 
-          t1: [p1, p4], t2: [p2, p3], 
-          history: getPartnershipCount(p1.id, p4.id, previousRounds) + getPartnershipCount(p2.id, p3.id, previousRounds) 
-        }
+        { t1: [p1, p2], t2: [p3, p4], history: getPartnershipCount(p1.id, p2.id, previousRounds) + getPartnershipCount(p3.id, p4.id, previousRounds) },
+        { t1: [p1, p3], t2: [p2, p4], history: getPartnershipCount(p1.id, p3.id, previousRounds) + getPartnershipCount(p2.id, p4.id, previousRounds) },
+        { t1: [p1, p4], t2: [p2, p3], history: getPartnershipCount(p1.id, p4.id, previousRounds) + getPartnershipCount(p2.id, p3.id, previousRounds) }
       ];
-
-      // Ordiniamo per minor storia di partnership. 
-      // Se la storia è identica, usiamo Math.random() per variare
       options.sort((a, b) => {
         if (a.history !== b.history) return a.history - b.history;
         return Math.random() - 0.5;
       });
-
       const best = options[0];
-      matches.push(createMatch(best.t1[0], best.t1[1], best.t2[0], best.t2[1], mode));
+      matches.push(createMatch(best.t1[0] as Player, best.t1[1] as Player, best.t2[0] as Player, best.t2[1] as Player, mode));
     }
   } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
-    // 1. Ordiniamo per ranking decrescente
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
-    
     while (playersToPair.length >= 4) {
-      // 2. Prendiamo l'atleta più forte rimasto
       const top = playersToPair.shift()!;
-      
-      // 3. Cerchiamo il partner analizzando TUTTI i rimanenti
       let bestPartnerIdx = 0;
       let bestScore = -Infinity; 
-      
       for (let i = 0; i < playersToPair.length; i++) {
         const history = getPartnershipCount(top.id, playersToPair[i].id, previousRounds);
-        // Priorità alla storia (evitare ripetizioni) e poi al bilanciamento rank (indice alto = rank basso)
         const score = (history * -1000) + i; 
-        
         if (score > bestScore) {
           bestScore = score;
           bestPartnerIdx = i;
         }
       }
-      
       const bottom = playersToPair.splice(bestPartnerIdx, 1)[0];
       const targetScore = getTot(top) + getTot(bottom);
-
-      // 4. Cerchiamo il Team B che meglio bilancia il target score 
       let allPossiblePairs: {p1Idx: number, p2Idx: number, diff: number, pHistory: number}[] = [];
-
       for (let i = 0; i < playersToPair.length; i++) {
         for (let j = i + 1; j < playersToPair.length; j++) {
           const currentPairScore = getTot(playersToPair[i]) + getTot(playersToPair[j]);
@@ -200,21 +182,15 @@ export const generateRound = (
           allPossiblePairs.push({ p1Idx: i, p2Idx: j, diff, pHistory });
         }
       }
-
       allPossiblePairs.sort((a, b) => {
-        if (Math.abs(a.diff - b.diff) < 8) {
-           return a.pHistory - b.pHistory;
-        }
+        if (Math.abs(a.diff - b.diff) < 8) return a.pHistory - b.pHistory;
         return a.diff - b.diff;
       });
-
       const bestChoice = allPossiblePairs[0];
       const highIdx = Math.max(bestChoice.p1Idx, bestChoice.p2Idx);
       const lowIdx = Math.min(bestChoice.p1Idx, bestChoice.p2Idx);
-
       const p2 = playersToPair.splice(highIdx, 1)[0];
       const p1 = playersToPair.splice(lowIdx, 1)[0];
-
       matches.push(createMatch(top, bottom, p1, p2, mode));
     }
   } else if (mode === MatchmakingMode.GENDER_BALANCED) {
