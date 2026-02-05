@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Player, MatchmakingMode, AppState, TrainingSession, Gender, Match, Round, AuthMode } from './types';
-import { loadFullState, savePlayersToDB, saveSessionsToDB, deletePlayerFromDB, deleteSessionFromDB, saveLocalBackup } from './services/storage';
+import { Player, MatchmakingMode, AppState, TrainingSession, Gender, Match, Round, AuthMode, AppSettings } from './types';
+import { loadFullState, savePlayersToDB, saveSessionsToDB, deletePlayerFromDB, deleteSessionFromDB, saveLocalBackup, loadSettings, saveSettingsToDB } from './services/storage';
 import { generateRound, calculateNewRatings } from './services/matchmaking';
 import PlayerList from './components/PlayerList';
 import ActiveTraining from './components/ActiveTraining';
 import TrainingHistory from './components/TrainingHistory';
 import PlayerStats from './components/PlayerStats';
+import AdminSettings from './components/AdminSettings';
 
 const AUTH_STORAGE_KEY = 'rmi_auth_session';
 
@@ -36,10 +37,11 @@ const App: React.FC = () => {
   const isInitialMount = useRef(true);
 
   useEffect(() => {
-    loadFullState().then(data => {
+    Promise.all([loadFullState(), loadSettings()]).then(([data, settings]) => {
       setState({
         players: data.players,
         sessions: data.sessions,
+        settings,
         currentTab: 'ranking',
         selectedPlayerId: null
       });
@@ -56,7 +58,8 @@ const App: React.FC = () => {
       try {
         await Promise.all([
           savePlayersToDB(state.players),
-          saveSessionsToDB(state.sessions)
+          saveSessionsToDB(state.sessions),
+          saveSettingsToDB(state.settings)
         ]);
         saveLocalBackup(state.players, state.sessions);
       } catch (e) {
@@ -66,7 +69,7 @@ const App: React.FC = () => {
       }
     }, 2000);
     return () => clearTimeout(timer);
-  }, [state?.players, state?.sessions]);
+  }, [state?.players, state?.sessions, state?.settings]);
 
   useEffect(() => {
     if (auth) localStorage.setItem(AUTH_STORAGE_KEY, auth);
@@ -133,59 +136,29 @@ const App: React.FC = () => {
     alert("Ricalcolo completato con successo!");
   };
 
-  const handleExportData = () => {
-    if (!state) return;
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", `RMI_FullBackup_${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
-  };
-
-  const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!window.confirm("Sovrascrivere TUTTO con questo file?")) return;
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const imported = JSON.parse(event.target?.result as string);
-        if (imported.players) {
-          setState({ ...imported, currentTab: 'ranking' });
-          alert("Dati pronti. Saranno salvati automaticamente tra pochi secondi.");
-        }
-      } catch { alert("Errore nel file."); }
-    };
-    reader.readAsText(file);
-  };
-
   const activeSession = state?.sessions.find(s => s.status === 'ACTIVE');
   const isAdmin = auth === 'admin';
-  const tabs = isAdmin ? ['ranking', 'training', 'history', 'stats'] : ['ranking', 'history', 'stats'];
-
-  // Ordinamento deterministico stabile: punti (desc) -> nome (asc)
-  const sortRanking = (players: any[]) => {
-    return [...players].sort((a, b) => {
-      const scoreA = a.basePoints + a.matchPoints;
-      const scoreB = b.basePoints + b.matchPoints;
-      if (scoreB !== scoreA) return scoreB - scoreA;
-      return a.name.localeCompare(b.name);
-    });
-  };
+  
+  const tabs = isAdmin 
+    ? ['ranking', 'training', 'history', 'stats', 'settings'] 
+    : (state?.settings.showStatsToAthletes ? ['ranking', 'history', 'stats'] : ['ranking', 'history']);
 
   const rankingDeltas = useMemo(() => {
     if (!state || state.sessions.length === 0) return {};
     const archivedSessions = state.sessions.filter(s => s.status === 'ARCHIVED').sort((a, b) => b.date - a.date);
     if (archivedSessions.length === 0) return {};
-    
     const lastSession = archivedSessions[0];
     const deltas: Record<string, { points: number, rankChange: number }> = {};
-    
     const visiblePlayers = state.players.filter(p => !p.isHidden);
-    const currentRanking = sortRanking(visiblePlayers);
     
+    const sortFn = (playersArr: any[]) => [...playersArr].sort((a, b) => {
+      const scoreA = a.basePoints + (a.matchPoints || 0);
+      const scoreB = b.basePoints + (b.matchPoints || 0);
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      return a.name.localeCompare(b.name);
+    });
+
+    const currentRanking = sortFn(visiblePlayers);
     const prevPlayers = visiblePlayers.map(p => {
       let sessionPoints = 0;
       lastSession.rounds.forEach(r => r.matches.forEach(m => {
@@ -195,8 +168,7 @@ const App: React.FC = () => {
       }));
       return { ...p, matchPoints: p.matchPoints - sessionPoints, sessionDelta: sessionPoints };
     });
-    
-    const prevRanking = sortRanking(prevPlayers);
+    const prevRanking = sortFn(prevPlayers);
     
     visiblePlayers.forEach(p => {
       const currentRank = currentRanking.findIndex(x => x.id === p.id) + 1;
@@ -206,7 +178,6 @@ const App: React.FC = () => {
         rankChange: currentRank === 0 || prevRank === 0 ? 0 : prevRank - currentRank 
       };
     });
-    
     return deltas;
   }, [state?.players, state?.sessions]);
 
@@ -259,9 +230,9 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
-          <nav className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
+          <nav className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner overflow-x-auto max-w-full no-scrollbar">
             {tabs.map(tab => (
-              <button key={tab} onClick={() => setState(p => p ? ({ ...p, currentTab: tab as any }) : null)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${state.currentTab === tab ? 'bg-white text-red-600 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-800'}`}>{tab}</button>
+              <button key={tab} onClick={() => setState(p => p ? ({ ...p, currentTab: tab as any }) : null)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 whitespace-nowrap ${state.currentTab === tab ? 'bg-white text-red-600 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-800'}`}>{tab === 'settings' ? '⚙️ Tech' : tab}</button>
             ))}
           </nav>
         </div>
@@ -277,7 +248,6 @@ const App: React.FC = () => {
             onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
             onResetPoints={() => {}} onRecalculate={recalculateAllPoints}
             onToggleHidden={(id) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, isHidden: !x.isHidden } : x) }) : null)}
-            onExport={handleExportData} onImport={handleImportData}
           />
         )}
         {isAdmin && state.currentTab === 'training' && (
@@ -312,6 +282,19 @@ const App: React.FC = () => {
         )}
         {state.currentTab === 'stats' && (
           <PlayerStats players={state.players} sessions={state.sessions} selectedPlayerId={state.selectedPlayerId} onSelectPlayer={(id) => setState(p => p ? ({ ...p, selectedPlayerId: id }) : null)} />
+        )}
+        {isAdmin && state.currentTab === 'settings' && (
+          <AdminSettings 
+            settings={state.settings}
+            onUpdateSettings={(newSets) => setState(p => p ? ({ ...p, settings: newSets }) : null)}
+            players={state.players}
+            sessions={state.sessions}
+            onRestoreSnapshot={(players, sessions) => {
+              if (window.confirm("Attenzione: Ripristinando questo snapshot sovrascriverai i dati attuali. Procedere?")) {
+                setState(p => p ? ({ ...p, players, sessions, currentTab: 'ranking' }) : null);
+              }
+            }}
+          />
         )}
       </main>
       <footer className="py-8 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest bg-white border-t">&copy; {new Date().getFullYear()} Roundnet Milano Manager</footer>

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { Player, TrainingSession, MatchmakingMode, Round } from '../types';
+import { Player, TrainingSession, MatchmakingMode, Round, AppSettings } from '../types';
 
 interface ActiveTrainingProps {
   session?: TrainingSession;
@@ -18,6 +18,7 @@ interface ActiveTrainingProps {
   onArchive: (sessionId: string) => void;
   onSelectPlayer: (id: string) => void;
   onEditParticipants?: (ids: string[]) => void;
+  settings?: AppSettings;
 }
 
 const getNextMonday = () => {
@@ -30,7 +31,7 @@ const getNextMonday = () => {
 };
 
 const ActiveTraining: React.FC<ActiveTrainingProps> = ({ 
-  session, players, attendanceMap, onStartSession, onAddRound, onDeleteRound, onRefreshRound, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onUpdateSessionDate, onArchive, onSelectPlayer, onEditParticipants
+  session, players, attendanceMap, onStartSession, onAddRound, onDeleteRound, onRefreshRound, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onUpdateSessionDate, onArchive, onSelectPlayer, onEditParticipants, settings
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>(session?.participantIds || []);
   const [matchScores, setMatchScores] = useState<Record<string, { s1: string, s2: string }>>({});
@@ -155,6 +156,9 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
       </div>
     );
   }
+
+  // Filtriamo i bottoni matchmaking in base alle impostazioni
+  const activeModes = settings?.activeMatchmakingModes || Object.values(MatchmakingMode);
 
   return (
     <div className="space-y-10 max-w-5xl mx-auto">
@@ -347,10 +351,12 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
           );
         })}
         <div className="bg-white rounded-3xl p-10 border-4 border-dotted border-slate-200 flex flex-wrap justify-center gap-4">
-          {Object.values(MatchmakingMode).filter(m => m !== 'CUSTOM').map(m => (
+          {activeModes.map(m => (
             <button key={m} onClick={() => onAddRound(session.id, m)} className="bg-slate-50 border border-slate-200 px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] hover:text-red-600 hover:border-red-500 transition-all hover:bg-red-50/50 shadow-sm">{m.replace('_', ' ')}</button>
           ))}
-          <button onClick={() => onAddRound(session.id, MatchmakingMode.CUSTOM)} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] hover:bg-black transition-all shadow-xl">Aggiungi Manuale</button>
+          {settings?.allowManualSessionCreation && (
+            <button onClick={() => onAddRound(session.id, MatchmakingMode.CUSTOM)} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] hover:bg-black transition-all shadow-xl">Aggiungi Manuale</button>
+          )}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { AppState, Player, TrainingSession } from '../types';
+import { AppSettings, AppSnapshot, Player, TrainingSession, MatchmakingMode } from '../types';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
@@ -13,6 +13,27 @@ if (SUPABASE_URL && SUPABASE_ANON_KEY) {
 const LOCAL_STORAGE_BACKUP_KEY = 'rmi_manager_local_backup';
 
 export const isDBConfigured = (): boolean => !!supabase;
+
+export const loadSettings = async (): Promise<AppSettings> => {
+  const defaultSettings: AppSettings = {
+    activeMatchmakingModes: Object.values(MatchmakingMode),
+    allowManualSessionCreation: true,
+    showStatsToAthletes: true,
+    adminUICompactMode: false
+  };
+
+  if (!supabase) return defaultSettings;
+
+  const { data, error } = await supabase.from('app_settings').select('settings').eq('id', 'main').single();
+  if (error || !data) return defaultSettings;
+  return data.settings;
+};
+
+export const saveSettingsToDB = async (settings: AppSettings) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('app_settings').upsert({ id: 'main', settings, updated_at: new Date().toISOString() });
+  if (error) throw error;
+};
 
 export const loadFullState = async (): Promise<{players: Player[], sessions: TrainingSession[]}> => {
   if (!supabase) {
@@ -31,7 +52,7 @@ export const loadFullState = async (): Promise<{players: Player[], sessions: Tra
   const players: Player[] = (playersRes.data || []).map(p => ({
     id: p.id,
     name: p.name,
-    nickname: p.nickname, // Mapping nuovo campo
+    nickname: p.nickname,
     gender: p.gender,
     basePoints: p.base_points,
     matchPoints: p.match_points,
@@ -52,13 +73,35 @@ export const loadFullState = async (): Promise<{players: Player[], sessions: Tra
   return { players, sessions };
 };
 
+export const createSnapshot = async (players: Player[], sessions: TrainingSession[], reason: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('app_snapshots').insert({
+    reason,
+    data: { players, sessions }
+  });
+  if (error) throw error;
+};
+
+export const getSnapshots = async (): Promise<Partial<AppSnapshot>[]> => {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('app_snapshots').select('id, created_at, reason').order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+};
+
+export const getSnapshotContent = async (id: string): Promise<AppSnapshot | null> => {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('app_snapshots').select('*').eq('id', id).single();
+  if (error) throw error;
+  return data;
+};
+
 export const savePlayersToDB = async (players: Player[]) => {
   if (!supabase) return;
-  
   const dbData = players.map(p => ({
     id: p.id,
     name: p.name,
-    nickname: p.nickname, // Mapping nuovo campo
+    nickname: p.nickname,
     gender: p.gender,
     base_points: p.basePoints,
     match_points: p.matchPoints,
@@ -66,14 +109,12 @@ export const savePlayersToDB = async (players: Player[]) => {
     losses: p.losses,
     is_hidden: p.isHidden
   }));
-
   const { error } = await supabase.from('players').upsert(dbData);
   if (error) throw error;
 };
 
 export const saveSessionsToDB = async (sessions: TrainingSession[]) => {
   if (!supabase) return;
-
   const dbData = sessions.map(s => ({
     id: s.id,
     date: s.date,
@@ -81,7 +122,6 @@ export const saveSessionsToDB = async (sessions: TrainingSession[]) => {
     participant_ids: s.participantIds,
     rounds: s.rounds
   }));
-
   const { error } = await supabase.from('sessions').upsert(dbData);
   if (error) throw error;
 };

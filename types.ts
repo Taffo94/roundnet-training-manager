@@ -5,7 +5,7 @@ export type AuthMode = 'admin' | 'user' | null;
 export interface Player {
   id: string;
   name: string;
-  nickname?: string; // Campo opzionale per il soprannome
+  nickname?: string;
   gender: Gender;
   wins: number;
   losses: number;
@@ -21,6 +21,23 @@ export enum MatchmakingMode {
   BALANCED_PAIRS = 'BALANCED_PAIRS',
   GENDER_BALANCED = 'GENDER_BALANCED',
   CUSTOM = 'CUSTOM'
+}
+
+export interface AppSettings {
+  activeMatchmakingModes: MatchmakingMode[];
+  allowManualSessionCreation: boolean;
+  showStatsToAthletes: boolean;
+  adminUICompactMode: boolean;
+}
+
+export interface AppSnapshot {
+  id: string;
+  created_at: string;
+  reason: string;
+  data: {
+    players: Player[];
+    sessions: TrainingSession[];
+  };
 }
 
 export interface Team {
@@ -58,6 +75,7 @@ export interface TrainingSession {
 export interface AppState {
   players: Player[];
   sessions: TrainingSession[];
-  currentTab: 'ranking' | 'training' | 'history' | 'stats';
+  settings: AppSettings;
+  currentTab: 'ranking' | 'training' | 'history' | 'stats' | 'settings';
   selectedPlayerId: string | null;
 }
