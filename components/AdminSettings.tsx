@@ -22,7 +22,8 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
   const [draftRanking, setDraftRanking] = useState<RankingSettings>(JSON.parse(JSON.stringify(settings.ranking)));
   const [activeDraftTab, setActiveDraftTab] = useState<'classic' | 'proportional'>('classic');
 
-  const [sandboxRanks, setSandboxRanks] = useState({ p1: 1000, p2: 1000, p3: 1000, p4: 1000 });
+  // Individual Sandbox Ranks
+  const [sandboxRanks, setSandboxRanks] = useState({ p1: 1200, p2: 1200, p3: 1200, p4: 1200 });
   const [sandboxScoreT1, setSandboxScoreT1] = useState(21);
   const [sandboxScoreT2, setSandboxScoreT2] = useState(15);
 
@@ -66,78 +67,89 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
   };
 
   const sandboxResults = useMemo(() => {
-    const p1: Player = { id: 'p1', name: 'A1', basePoints: sandboxRanks.p1, matchPoints: 0, wins: 0, losses: 0, gender: 'M', lastActive: 0 };
-    const p2: Player = { id: 'p2', name: 'A2', basePoints: sandboxRanks.p2, matchPoints: 0, wins: 0, losses: 0, gender: 'M', lastActive: 0 };
-    const p3: Player = { id: 'p3', name: 'A3', basePoints: sandboxRanks.p3, matchPoints: 0, wins: 0, losses: 0, gender: 'F', lastActive: 0 };
-    const p4: Player = { id: 'p4', name: 'A4', basePoints: sandboxRanks.p4, matchPoints: 0, wins: 0, losses: 0, gender: 'F', lastActive: 0 };
+    const p1: Player = { id: 'p1', name: 'Atleta 1', basePoints: sandboxRanks.p1, matchPoints: 0, wins: 0, losses: 0, gender: 'M', lastActive: 0 };
+    const p2: Player = { id: 'p2', name: 'Atleta 2', basePoints: sandboxRanks.p2, matchPoints: 0, wins: 0, losses: 0, gender: 'M', lastActive: 0 };
+    const p3: Player = { id: 'p3', name: 'Atleta 3', basePoints: sandboxRanks.p3, matchPoints: 0, wins: 0, losses: 0, gender: 'F', lastActive: 0 };
+    const p4: Player = { id: 'p4', name: 'Atleta 4', basePoints: sandboxRanks.p4, matchPoints: 0, wins: 0, losses: 0, gender: 'F', lastActive: 0 };
+
     const classicRes = calculateNewRatings(p1, p2, p3, p4, sandboxScoreT1, sandboxScoreT2, { ...draftRanking, mode: 'CLASSIC' });
     const proportionalRes = calculateNewRatings(p1, p2, p3, p4, sandboxScoreT1, sandboxScoreT2, { ...draftRanking, mode: 'PROPORTIONAL' });
+
     return { classic: classicRes, proportional: proportionalRes };
   }, [sandboxRanks, sandboxScoreT1, sandboxScoreT2, draftRanking]);
 
-  const currentModeResults = draftRanking.mode === 'CLASSIC' ? sandboxResults.classic : sandboxResults.proportional;
   const lastUpdatedStr = settings.lastUpdated ? new Date(settings.lastUpdated).toLocaleString() : 'Mai';
+
+  const BreakdownView = ({ result, title, isActive }: { result: any, title: string, isActive: boolean }) => (
+    <div className={`flex-1 p-6 rounded-[2rem] border-2 transition-all duration-500 ${isActive ? 'bg-white border-red-600 shadow-xl ring-4 ring-red-50' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h4 className={`text-[10px] font-black uppercase tracking-[0.2em] ${isActive ? 'text-red-600' : 'text-slate-400'}`}>{title}</h4>
+          <div className="text-xs font-black text-slate-800 italic uppercase">K-Effettivo: {result.kUsed.toFixed(2)}</div>
+        </div>
+        {isActive && <span className="bg-red-600 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest animate-pulse">Prod Mode</span>}
+      </div>
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          {['p1', 'p2', 'p3', 'p4'].map(pid => {
+            const delta = result.individualDeltas[pid];
+            return (
+              <div key={pid} className="bg-white p-3 rounded-xl border border-slate-100 flex flex-col justify-center shadow-sm">
+                <div className="text-[8px] font-black text-slate-400 uppercase leading-none mb-1">Atl. {pid.slice(1)}</div>
+                <div className={`text-lg font-black italic leading-none ${delta >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {delta >= 0 ? '+' : ''}{delta.toFixed(2)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="max-w-6xl mx-auto space-y-12 pb-20">
       
-      {/* SNAPSHOTS */}
+      {/* SNAPSHOTS SECTION */}
       <section className="bg-white rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden">
         <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50">
            <div>
               <h2 className="text-2xl font-black text-slate-800 uppercase italic tracking-tighter">Data Integrity</h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Backup completi (Atleti, Match e Ranking)</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Backup completi e ripristino istantaneo</p>
            </div>
            <div className="flex gap-4">
-              <input type="text" placeholder="Motivo backup..." value={backupReason} onChange={e => setBackupReason(e.target.value)} className="p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold w-48" />
-              <button onClick={handleBackup} disabled={isBackingUp} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl">Snapshot</button>
+              <input type="text" placeholder="Motivo backup..." value={backupReason} onChange={e => setBackupReason(e.target.value)} className="p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold w-48 focus:border-red-500 outline-none" />
+              <button onClick={handleBackup} disabled={isBackingUp} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-black transition-all">Snapshot</button>
            </div>
         </div>
         <div className="p-10 grid grid-cols-1 md:grid-cols-3 gap-6">
           {snapshots.map(s => (
-            <div key={s.id} className="p-6 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between group">
+            <div key={s.id} className="p-6 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between group hover:border-red-200 transition-colors">
                <div>
                   <div className="text-[8px] font-black text-slate-400 uppercase mb-1">{new Date(s.created_at!).toLocaleString()}</div>
                   <div className="text-sm font-black text-slate-800 uppercase italic mb-4 leading-tight">{s.reason}</div>
                </div>
-               <button onClick={() => handleRestore(s.id!)} className="w-full py-2 bg-white border border-slate-200 rounded-xl text-[9px] font-black uppercase text-slate-500 group-hover:bg-red-600 group-hover:text-white transition-all">Restore</button>
+               <button onClick={() => handleRestore(s.id!)} className="w-full py-2 bg-white border border-slate-200 rounded-xl text-[9px] font-black uppercase text-slate-500 group-hover:bg-red-600 group-hover:text-white group-hover:border-red-600 transition-all">Restore</button>
             </div>
           ))}
+          {snapshots.length === 0 && <div className="col-span-full py-12 text-center text-slate-300 font-bold uppercase text-[10px] italic tracking-widest">Nessuno snapshot disponibile</div>}
         </div>
       </section>
 
-      {/* LIVE DASHBOARD */}
-      <section className="bg-slate-900 rounded-[2rem] p-8 text-white shadow-2xl relative overflow-hidden ring-4 ring-slate-200">
-        <div className="relative z-10 flex flex-col md:flex-row justify-between gap-8">
-           <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                 <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]"></div>
-                 <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Motore Attivo</h3>
-              </div>
-              <div>
-                <div className="text-4xl font-black italic uppercase tracking-tighter text-red-500">{settings.ranking.mode}</div>
-                <div className="text-[9px] font-bold text-slate-500 uppercase mt-1 tracking-widest">Ultimo salvataggio: <span className="text-white">{lastUpdatedStr}</span></div>
-              </div>
-           </div>
-           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-sm">
-              <div><div className="text-[8px] font-black text-slate-500 uppercase mb-1">K-Base</div><div className="text-xl font-black">{settings.ranking.mode === 'CLASSIC' ? settings.ranking.classic.kBase : settings.ranking.proportional.kBase}</div></div>
-              <div><div className="text-[8px] font-black text-slate-500 uppercase mb-1">Bonus Factor</div><div className="text-xl font-black">{settings.ranking.mode === 'CLASSIC' ? settings.ranking.classic.bonusFactor : settings.ranking.proportional.bonusFactor}x</div></div>
-              <div><div className="text-[8px] font-black text-slate-500 uppercase mb-1">Threshold / Margin</div><div className="text-xl font-black">{settings.ranking.mode === 'CLASSIC' ? settings.ranking.classic.classicBonusMargin : settings.ranking.proportional.maxPossibleMargin}</div></div>
-           </div>
-        </div>
-      </section>
-
-      {/* EDITOR & SIMULATOR */}
+      {/* PARAMETERS & SIMULATOR GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-         <section className="lg:col-span-5 bg-white rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden flex flex-col">
+         
+         {/* LEFT: PARAMETERS EDITOR */}
+         <section className="lg:col-span-4 bg-white rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden flex flex-col h-fit">
             <div className="p-8 bg-slate-100 border-b border-slate-200">
                <div className="flex justify-between items-center mb-6">
                   <h3 className="font-black text-sm uppercase italic tracking-widest text-slate-800">Parametri Draft</h3>
-                  <div className={`text-[8px] font-black px-2 py-1 rounded ${isSettingsDirty ? 'bg-red-600 text-white' : 'bg-slate-300'}`}>{isSettingsDirty ? 'UNSAVED' : 'SYNCED'}</div>
+                  <div className={`text-[8px] font-black px-2 py-1 rounded transition-colors ${isSettingsDirty ? 'bg-red-600 text-white' : 'bg-slate-300'}`}>{isSettingsDirty ? 'UNSAVED' : 'SYNCED'}</div>
                </div>
                <div className="flex bg-slate-200 p-1 rounded-xl">
-                  <button onClick={() => setActiveDraftTab('classic')} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase ${activeDraftTab === 'classic' ? 'bg-white text-slate-900' : 'text-slate-400'}`}>Classic</button>
-                  <button onClick={() => setActiveDraftTab('proportional')} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase ${activeDraftTab === 'proportional' ? 'bg-white text-slate-900' : 'text-slate-400'}`}>Proportional</button>
+                  <button onClick={() => setActiveDraftTab('classic')} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${activeDraftTab === 'classic' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>Classic</button>
+                  <button onClick={() => setActiveDraftTab('proportional')} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${activeDraftTab === 'proportional' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>Proportional</button>
                </div>
             </div>
             <div className="p-8 space-y-8">
@@ -162,129 +174,84 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
                      </div>
                   )}
                </div>
-               <div className="pt-6 border-t border-slate-100">
+               <div className="pt-6 border-t border-slate-100 space-y-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block text-center">Modalità Produzione</label>
                   <div className="flex gap-2">
-                     <button onClick={() => setDraftRanking(prev => ({ ...prev, mode: 'CLASSIC' }))} className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase ${draftRanking.mode === 'CLASSIC' ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>CLASSIC</button>
-                     <button onClick={() => setDraftRanking(prev => ({ ...prev, mode: 'PROPORTIONAL' }))} className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase ${draftRanking.mode === 'PROPORTIONAL' ? 'bg-red-600 text-white' : 'text-slate-400'}`}>PROPORTIONAL</button>
+                     <button onClick={() => setDraftRanking(prev => ({ ...prev, mode: 'CLASSIC' }))} className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase transition-all ${draftRanking.mode === 'CLASSIC' ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'text-slate-400 border-slate-100'}`}>CLASSIC</button>
+                     <button onClick={() => setDraftRanking(prev => ({ ...prev, mode: 'PROPORTIONAL' }))} className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase transition-all ${draftRanking.mode === 'PROPORTIONAL' ? 'bg-red-600 text-white border-red-600 shadow-lg' : 'text-slate-400 border-slate-100'}`}>PROPORTIONAL</button>
                   </div>
                </div>
-               {isSettingsDirty && <button onClick={() => setShowConfirmModal(true)} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase text-[11px] animate-pulse">Applica Modifiche</button>}
+               {isSettingsDirty && (
+                 <button onClick={() => setShowConfirmModal(true)} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase text-[11px] animate-pulse tracking-widest shadow-xl shadow-red-100">Applica Modifiche</button>
+               )}
             </div>
          </section>
 
-         <section className="lg:col-span-7 bg-white rounded-[2.5rem] shadow-sm border border-slate-200 p-10 space-y-10">
-            <div><h3 className="font-black text-xs text-slate-800 uppercase tracking-[0.3em] border-l-4 border-red-600 pl-4 mb-2">Simulatore Ranking</h3></div>
-            <div className="grid grid-cols-2 gap-10">
-               <div className="space-y-4">
-                  <div className="flex justify-between items-center bg-slate-100 px-4 py-2 rounded-xl"><span className="text-[10px] font-black uppercase text-slate-500">Team 1</span><input type="number" value={sandboxScoreT1} onChange={e => setSandboxScoreT1(parseInt(e.target.value) || 0)} className="w-12 p-1 bg-white rounded font-black text-xs text-center" /></div>
-                  <div className="space-y-3">
-                     <input type="number" value={sandboxRanks.p1} onChange={e => setSandboxRanks(p => ({...p, p1: parseInt(e.target.value) || 0}))} className="w-full p-2 bg-slate-50 border rounded-lg font-black text-xs" />
-                     <input type="number" value={sandboxRanks.p2} onChange={e => setSandboxRanks(p => ({...p, p2: parseInt(e.target.value) || 0}))} className="w-full p-2 bg-slate-50 border rounded-lg font-black text-xs" />
-                  </div>
+         {/* RIGHT: DYNAMIC SIMULATOR COMPARISON */}
+         <section className="lg:col-span-8 space-y-10">
+            <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 p-10 space-y-10">
+               <div>
+                  <h3 className="font-black text-xs text-slate-800 uppercase tracking-[0.3em] border-l-4 border-red-600 pl-4 mb-2">Simulatore Comparativo</h3>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Confronta Classic vs Proportional in tempo reale</p>
                </div>
-               <div className="space-y-4">
-                  <div className="flex justify-between items-center bg-slate-100 px-4 py-2 rounded-xl"><span className="text-[10px] font-black uppercase text-slate-500">Team 2</span><input type="number" value={sandboxScoreT2} onChange={e => setSandboxScoreT2(parseInt(e.target.value) || 0)} className="w-12 p-1 bg-white rounded font-black text-xs text-center" /></div>
-                  <div className="space-y-3">
-                     <input type="number" value={sandboxRanks.p3} onChange={e => setSandboxRanks(p => ({...p, p3: parseInt(e.target.value) || 0}))} className="w-full p-2 bg-slate-50 border rounded-lg font-black text-xs text-right" />
-                     <input type="number" value={sandboxRanks.p4} onChange={e => setSandboxRanks(p => ({...p, p4: parseInt(e.target.value) || 0}))} className="w-full p-2 bg-slate-50 border rounded-lg font-black text-xs text-right" />
-                  </div>
-               </div>
-            </div>
-            <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-200 space-y-6">
-               <div className="flex justify-between items-center"><div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">BREAKDOWN {draftRanking.mode}</div><div className="text-[10px] font-black text-red-600">K-Effettivo: {currentModeResults.kUsed.toFixed(2)}</div></div>
+
+               {/* SIMULATOR INPUTS */}
                <div className="grid grid-cols-2 gap-10">
                   <div className="space-y-4">
-                     {['p1', 'p2'].map(pid => (
-                        <div key={pid} className="bg-white p-4 rounded-2xl border flex justify-between items-center shadow-sm">
-                           <div><div className="text-[8px] font-black text-slate-400 uppercase">Atleta {pid === 'p1' ? '1' : '2'}</div><div className="text-sm font-black text-slate-800 italic">{(sandboxRanks as any)[pid]} PT</div></div>
-                           <div className={`text-xl font-black italic ${currentModeResults.individualDeltas[pid] >= 0 ? 'text-green-500' : 'text-red-500'}`}>{(currentModeResults.individualDeltas[pid] >= 0 ? '+' : '') + currentModeResults.individualDeltas[pid].toFixed(3)}</div>
+                     <div className="flex justify-between items-center bg-slate-100 px-4 py-2 rounded-xl">
+                        <span className="text-[10px] font-black uppercase text-slate-500">Team 1</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[8px] font-black text-slate-400 uppercase">Score:</span>
+                          <input type="number" value={sandboxScoreT1} onChange={e => setSandboxScoreT1(parseInt(e.target.value) || 0)} className="w-12 p-1 bg-white rounded font-black text-xs text-center border-slate-200" />
                         </div>
-                     ))}
+                     </div>
+                     <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[8px] font-black text-slate-400 uppercase">A1 ELO</label>
+                          <input type="number" value={sandboxRanks.p1} onChange={e => setSandboxRanks(p => ({...p, p1: parseInt(e.target.value) || 0}))} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-black text-xs" />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[8px] font-black text-slate-400 uppercase">A2 ELO</label>
+                          <input type="number" value={sandboxRanks.p2} onChange={e => setSandboxRanks(p => ({...p, p2: parseInt(e.target.value) || 0}))} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-black text-xs" />
+                        </div>
+                     </div>
                   </div>
                   <div className="space-y-4">
-                     {['p3', 'p4'].map(pid => (
-                        <div key={pid} className="bg-white p-4 rounded-2xl border flex justify-between items-center shadow-sm">
-                           <div className={`text-xl font-black italic ${currentModeResults.individualDeltas[pid] >= 0 ? 'text-green-500' : 'text-red-500'}`}>{(currentModeResults.individualDeltas[pid] >= 0 ? '+' : '') + currentModeResults.individualDeltas[pid].toFixed(3)}</div>
-                           <div className="text-right"><div className="text-[8px] font-black text-slate-400 uppercase">Atleta {pid === 'p3' ? '3' : '4'}</div><div className="text-sm font-black text-slate-800 italic">{(sandboxRanks as any)[pid]} PT</div></div>
+                     <div className="flex justify-between items-center bg-slate-100 px-4 py-2 rounded-xl">
+                        <span className="text-[10px] font-black uppercase text-slate-500">Team 2</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[8px] font-black text-slate-400 uppercase">Score:</span>
+                          <input type="number" value={sandboxScoreT2} onChange={e => setSandboxScoreT2(parseInt(e.target.value) || 0)} className="w-12 p-1 bg-white rounded font-black text-xs text-center border-slate-200" />
                         </div>
-                     ))}
+                     </div>
+                     <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[8px] font-black text-slate-400 uppercase text-right">A3 ELO</label>
+                          <input type="number" value={sandboxRanks.p3} onChange={e => setSandboxRanks(p => ({...p, p3: parseInt(e.target.value) || 0}))} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-black text-xs text-right" />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[8px] font-black text-slate-400 uppercase text-right">A4 ELO</label>
+                          <input type="number" value={sandboxRanks.p4} onChange={e => setSandboxRanks(p => ({...p, p4: parseInt(e.target.value) || 0}))} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-black text-xs text-right" />
+                        </div>
+                     </div>
                   </div>
+               </div>
+
+               {/* SIDE-BY-SIDE BREAKDOWN */}
+               <div className="flex flex-col md:flex-row gap-8">
+                  <BreakdownView result={sandboxResults.classic} title="Modello Classic" isActive={draftRanking.mode === 'CLASSIC'} />
+                  <BreakdownView result={sandboxResults.proportional} title="Modello Proportional" isActive={draftRanking.mode === 'PROPORTIONAL'} />
+               </div>
+
+               <div className="p-4 bg-yellow-50 rounded-2xl border border-yellow-100 flex items-start gap-4">
+                  <span className="text-xl">ℹ️</span>
+                  <p className="text-[10px] font-bold text-yellow-800 leading-relaxed uppercase tracking-tight">
+                    Il modello <b>Proportional</b> premia linearmente ogni punto di scarto. Il modello <b>Classic</b> applica un bonus fisso solo se viene superato il Threshold impostato. Entrambi usano lo scarto individuale basato sul proprio ELO e la media avversaria.
+                  </p>
                </div>
             </div>
          </section>
       </div>
-
-      {/* DOCUMENTAZIONE TECNICA */}
-      <section className="bg-white rounded-[3rem] shadow-xl border border-slate-200 p-12 space-y-12">
-        <div className="text-center">
-          <h2 className="text-3xl font-black text-slate-800 uppercase italic tracking-tighter">Guida Tecnica ai Parametri</h2>
-          <p className="text-slate-400 text-xs font-bold uppercase mt-2 tracking-widest">Capire come il sistema calcola la variazione di punti</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          {/* Formula Base ELO */}
-          <div className="space-y-6">
-            <h4 className="text-sm font-black text-slate-800 uppercase border-b-2 border-slate-100 pb-4">1. La Formula ELO Individuale</h4>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Il sistema non assegna punti uguali alla squadra, ma calcola il delta per <b>ogni singolo atleta</b> basandosi sulla probabilità di vittoria (Expected Score).
-            </p>
-            <div className="bg-slate-50 p-6 rounded-3xl font-mono text-[10px] space-y-4 border border-slate-100">
-              <div>
-                <span className="text-red-600 font-bold">E = 1 / (1 + 10^((AvgOpp - MyElo) / 400))</span>
-                <p className="text-slate-400 mt-1 italic">// E: Probabilità di vittoria (da 0 a 1)</p>
-              </div>
-              <div>
-                <span className="text-slate-800 font-black">Delta = K * (Risultato - E)</span>
-                <p className="text-slate-400 mt-1 italic">// Risultato: 1 se vince, 0 se perde</p>
-              </div>
-            </div>
-            <p className="text-[10px] text-slate-400 italic">
-              *Nota: Se un giocatore forte vince contro uno debole, riceve pochi punti (E è alto). Se perde, ne perde molti.
-            </p>
-          </div>
-
-          {/* Calcolo K-Effettivo */}
-          <div className="space-y-6">
-            <h4 className="text-sm font-black text-slate-800 uppercase border-b-2 border-slate-100 pb-4">2. Calcolo del K-Effettivo</h4>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Il valore <b>K</b> determina quanto è "aggressiva" la variazione. RMI usa due algoritmi per premiare la qualità della vittoria (scarto punti).
-            </p>
-            
-            <div className="space-y-4">
-              <div className="bg-slate-900 text-white p-5 rounded-2xl">
-                <div className="text-[10px] font-black text-red-500 mb-2 uppercase">CLASSIC MODE</div>
-                <div className="text-[11px] font-mono leading-relaxed">
-                  Se Scarto &ge; Margin: <br/>
-                  <span className="text-green-400">K = kBase * bonusFactor</span> <br/>
-                  Altrimenti: <span className="text-slate-400">K = kBase</span>
-                </div>
-                <p className="text-[8px] text-slate-500 mt-2">Funzione a gradino: il premio scatta solo oltre la soglia.</p>
-              </div>
-
-              <div className="bg-red-600 text-white p-5 rounded-2xl shadow-xl">
-                <div className="text-[10px] font-black text-white/60 mb-2 uppercase">PROPORTIONAL MODE</div>
-                <div className="text-[11px] font-mono leading-relaxed">
-                  Ratio = Min(Scarto / Saturation, 1) <br/>
-                  <span className="text-white font-bold">K = kBase * (1 + Ratio * (bonusFactor - 1))</span>
-                </div>
-                <p className="text-[8px] text-white/60 mt-2">Funzione lineare: ogni punto di scarto aumenta progressivamente il K.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-slate-50 p-8 rounded-[2rem] border border-dashed border-slate-200">
-           <div className="flex items-center gap-4 mb-4">
-              <span className="text-2xl">💡</span>
-              <h5 className="text-xs font-black text-slate-800 uppercase tracking-widest">Perché i punti non tornano?</h5>
-           </div>
-           <ul className="text-xs text-slate-500 space-y-2 list-disc pl-5">
-              <li><b>Asimmetria:</b> Se un atleta da 2000 PT gioca con uno da 1000 PT contro due da 1500 PT, il giocatore da 2000 riceverà meno punti in caso di vittoria (perché era "atteso" che vincesse) rispetto al suo compagno da 1000.</li>
-              <li><b>Somma non zero:</b> Poiché il calcolo è individuale basato sulla media degli avversari, la somma dei punti guadagnati da T1 non è necessariamente l'esatto opposto di quelli persi da T2, sebbene nel lungo periodo tendano a bilanciarsi.</li>
-              <li><b>Arrotondamenti:</b> Nella visualizzazione dei match i punti sono arrotondati all'intero più vicino, ma nel database sono salvati con precisione decimale per evitare errori cumulativi.</li>
-           </ul>
-        </div>
-      </section>
 
       {/* CONFIRMATION MODAL */}
       {showConfirmModal && (
@@ -292,17 +259,17 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
            <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl p-12 text-center space-y-8 animate-in zoom-in-95 duration-300">
               <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto text-3xl shadow-inner italic font-black">!</div>
               <div>
-                 <h4 className="text-2xl font-black text-slate-800 uppercase italic tracking-tighter text-red-600">Applica Parametri</h4>
-                 <p className="text-slate-400 text-xs font-bold uppercase mt-2">I nuovi parametri verranno salvati nel database</p>
+                 <h4 className="text-2xl font-black text-slate-800 uppercase italic tracking-tighter text-red-600">Conferma Produzione</h4>
+                 <p className="text-slate-400 text-xs font-bold uppercase mt-2">Stai per aggiornare i parametri di calcolo ufficiali</p>
               </div>
               <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-200 text-left">
-                 <div className="space-y-1"><span className="text-[8px] font-black text-slate-400 uppercase">Modalità</span><div className="text-sm font-black text-slate-800 uppercase italic">{draftRanking.mode}</div></div>
+                 <div className="space-y-1"><span className="text-[8px] font-black text-slate-400 uppercase">Modo</span><div className="text-sm font-black text-slate-800 italic uppercase">{draftRanking.mode}</div></div>
                  <div className="space-y-1"><span className="text-[8px] font-black text-slate-400 uppercase">K-Base</span><div className="text-sm font-black text-slate-800">{draftRanking[draftRanking.mode === 'CLASSIC' ? 'classic' : 'proportional'].kBase}</div></div>
               </div>
               <div className="space-y-3">
-                 <button onClick={() => handleApplySettings(true)} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl">Salva e Ricalcola Tutto</button>
-                 <button onClick={() => handleApplySettings(false)} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl">Salva (Match futuri)</button>
-                 <button onClick={() => setShowConfirmModal(false)} className="w-full py-2 text-slate-400 font-black uppercase text-[10px] tracking-widest">Indietro</button>
+                 <button onClick={() => handleApplySettings(true)} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-red-100 hover:bg-red-700 transition-all">Salva e Ricalcola Storico</button>
+                 <button onClick={() => handleApplySettings(false)} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-black transition-all">Salva Solo Match Futuri</button>
+                 <button onClick={() => setShowConfirmModal(false)} className="w-full py-2 text-slate-400 font-black uppercase text-[10px] tracking-widest">Torna Indietro</button>
               </div>
            </div>
         </div>
