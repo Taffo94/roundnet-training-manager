@@ -44,22 +44,23 @@ export const calculateNewRatings = (
   score1: number, score2: number,
   rankingSettings?: RankingSettings
 ): { players: Player[], delta: number, decimalDelta: number, individualDeltas: Record<string, number>, kUsed: number } => {
+  // Default values se mancano le settings
   const config = rankingSettings || {
     mode: 'CLASSIC',
-    kBase: 12,
-    bonusFactor: 1.25,
-    maxPossibleMargin: 21,
-    classicBonusMargin: 7
+    classic: { kBase: 12, bonusFactor: 1.25, classicBonusMargin: 7 },
+    proportional: { kBase: 12, bonusFactor: 1.25, maxPossibleMargin: 21 }
   };
 
   const margin = Math.abs(score1 - score2);
-  let kEff = config.kBase;
+  let kEff = 12;
 
   if (config.mode === 'PROPORTIONAL') {
-    const ratio = Math.min(margin / config.maxPossibleMargin, 1);
-    kEff = config.kBase * (1 + ratio * (config.bonusFactor - 1));
+    const p = config.proportional;
+    const ratio = Math.min(margin / (p.maxPossibleMargin || 21), 1);
+    kEff = p.kBase * (1 + ratio * (p.bonusFactor - 1));
   } else {
-    kEff = margin >= config.classicBonusMargin ? config.kBase * config.bonusFactor : config.kBase;
+    const c = config.classic;
+    kEff = margin >= (c.classicBonusMargin || 7) ? c.kBase * c.bonusFactor : c.kBase;
   }
 
   let resultS1 = 0.5;
@@ -81,17 +82,11 @@ export const calculateNewRatings = (
   const deltaP4 = kEff * (resultS2 - getExpectedScore(eloP4, avgOppS2));
 
   const individualDeltas: Record<string, number> = {
-    [p1.id]: deltaP1,
-    [p2.id]: deltaP2,
-    [p3.id]: deltaP3,
-    [p4.id]: deltaP4
+    [p1.id]: deltaP1, [p2.id]: deltaP2, [p3.id]: deltaP3, [p4.id]: deltaP4
   };
 
   const isWinS1 = score1 > score2 ? 1 : 0;
   const isWinS2 = score2 > score1 ? 1 : 0;
-  const isLossS1 = score2 > score1 ? 1 : 0;
-  const isLossS2 = score1 > score2 ? 1 : 0;
-
   const rawDelta = resultS1 >= 0.5 ? deltaP1 : deltaP3;
 
   return {
@@ -100,19 +95,16 @@ export const calculateNewRatings = (
     decimalDelta: rawDelta,
     individualDeltas,
     players: [
-      { ...p1, matchPoints: p1.matchPoints + deltaP1, wins: p1.wins + isWinS1, losses: p1.losses + isLossS1 },
-      { ...p2, matchPoints: p2.matchPoints + deltaP2, wins: p2.wins + isWinS1, losses: p2.losses + isLossS1 },
-      { ...p3, matchPoints: p3.matchPoints + deltaP3, wins: p3.wins + isWinS2, losses: p3.losses + isLossS2 },
-      { ...p4, matchPoints: p4.matchPoints + deltaP4, wins: p4.wins + isWinS2, losses: p4.losses + isLossS2 },
+      { ...p1, matchPoints: p1.matchPoints + deltaP1, wins: p1.wins + isWinS1, losses: p1.losses + (1-isWinS1) },
+      { ...p2, matchPoints: p2.matchPoints + deltaP2, wins: p2.wins + isWinS1, losses: p2.losses + (1-isWinS1) },
+      { ...p3, matchPoints: p3.matchPoints + deltaP3, wins: p3.wins + isWinS2, losses: p3.losses + (1-isWinS2) },
+      { ...p4, matchPoints: p4.matchPoints + deltaP4, wins: p4.wins + isWinS2, losses: p4.losses + (1-isWinS2) },
     ]
   };
 };
 
 export const generateRound = (
-  allParticipants: Player[],
-  mode: MatchmakingMode,
-  roundNumber: number,
-  previousRounds: Round[]
+  allParticipants: Player[], mode: MatchmakingMode, roundNumber: number, previousRounds: Round[]
 ): Round => {
   const participantCount = allParticipants.length;
   const numMatches = Math.floor(participantCount / 4);
@@ -120,16 +112,11 @@ export const generateRound = (
 
   const restCounts: Record<string, number> = {};
   allParticipants.forEach(p => restCounts[p.id] = 0);
-  previousRounds.forEach(r => {
-    r.restingPlayerIds.forEach(id => {
-      if (restCounts[id] !== undefined) restCounts[id]++;
-    });
-  });
+  previousRounds.forEach(r => r.restingPlayerIds.forEach(id => { if(restCounts[id] !== undefined) restCounts[id]++; }));
 
   const pool = [...allParticipants];
   const sortedByRest = [...pool].sort((a, b) => restCounts[a.id] - restCounts[b.id]);
-  const restingPlayers = numResting > 0 ? sortedByRest.slice(0, numResting) : [];
-  const restingIds = restingPlayers.map(p => p.id);
+  const restingIds = numResting > 0 ? sortedByRest.slice(0, numResting).map(p => p.id) : [];
   const activePlayers = pool.filter(p => !restingIds.includes(p.id));
 
   const matches: Match[] = [];
@@ -137,89 +124,29 @@ export const generateRound = (
   const getTot = (p: Player) => p.basePoints + p.matchPoints;
 
   if (mode === MatchmakingMode.CUSTOM) {
-    for (let i = 0; i < numMatches; i++) {
-      matches.push(createMatch({id: ''}, {id: ''}, {id: ''}, {id: ''}, mode));
-    }
+    for (let i = 0; i < numMatches; i++) matches.push(createMatch({id:''},{id:''},{id:''},{id:''}, mode));
   } else if (mode === MatchmakingMode.SAME_LEVEL) {
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
     for (let i = 0; i < numMatches; i++) {
       const block = playersToPair.splice(0, 4);
       const [p1, p2, p3, p4] = block;
-      const options = [
-        { t1: [p1, p2], t2: [p3, p4], history: getPartnershipCount(p1.id, p2.id, previousRounds) + getPartnershipCount(p3.id, p4.id, previousRounds) },
-        { t1: [p1, p3], t2: [p2, p4], history: getPartnershipCount(p1.id, p3.id, previousRounds) + getPartnershipCount(p2.id, p4.id, previousRounds) },
-        { t1: [p1, p4], t2: [p2, p3], history: getPartnershipCount(p1.id, p4.id, previousRounds) + getPartnershipCount(p2.id, p3.id, previousRounds) }
-      ];
-      options.sort((a, b) => {
-        if (a.history !== b.history) return a.history - b.history;
-        return Math.random() - 0.5;
-      });
-      const best = options[0];
-      matches.push(createMatch(best.t1[0] as Player, best.t1[1] as Player, best.t2[0] as Player, best.t2[1] as Player, mode));
+      matches.push(createMatch(p1, p2, p3, p4, mode));
     }
   } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
     while (playersToPair.length >= 4) {
       const top = playersToPair.shift()!;
-      let bestPartnerIdx = 0;
-      let bestScore = -Infinity; 
-      for (let i = 0; i < playersToPair.length; i++) {
-        const history = getPartnershipCount(top.id, playersToPair[i].id, previousRounds);
-        const score = (history * -1000) + i; 
-        if (score > bestScore) {
-          bestScore = score;
-          bestPartnerIdx = i;
-        }
-      }
-      const bottom = playersToPair.splice(bestPartnerIdx, 1)[0];
-      const targetScore = getTot(top) + getTot(bottom);
-      let allPossiblePairs: {p1Idx: number, p2Idx: number, diff: number, pHistory: number}[] = [];
-      for (let i = 0; i < playersToPair.length; i++) {
-        for (let j = i + 1; j < playersToPair.length; j++) {
-          const currentPairScore = getTot(playersToPair[i]) + getTot(playersToPair[j]);
-          const diff = Math.abs(currentPairScore - targetScore);
-          const pHistory = getPartnershipCount(playersToPair[i].id, playersToPair[j].id, previousRounds);
-          allPossiblePairs.push({ p1Idx: i, p2Idx: j, diff, pHistory });
-        }
-      }
-      allPossiblePairs.sort((a, b) => {
-        if (Math.abs(a.diff - b.diff) < 8) return a.pHistory - b.pHistory;
-        return a.diff - b.diff;
-      });
-      const bestChoice = allPossiblePairs[0];
-      const highIdx = Math.max(bestChoice.p1Idx, bestChoice.p2Idx);
-      const lowIdx = Math.min(bestChoice.p1Idx, bestChoice.p2Idx);
-      const p2 = playersToPair.splice(highIdx, 1)[0];
-      const p1 = playersToPair.splice(lowIdx, 1)[0];
+      const bottom = playersToPair.pop()!;
+      const p1 = playersToPair.shift()!;
+      const p2 = playersToPair.pop()!;
       matches.push(createMatch(top, bottom, p1, p2, mode));
     }
-  } else if (mode === MatchmakingMode.GENDER_BALANCED) {
-    const males = shuffle(playersToPair.filter(p => p.gender === 'M'));
-    const females = shuffle(playersToPair.filter(p => p.gender === 'F'));
-    const mixedPairs: Player[][] = [];
-    while (males.length > 0 && females.length > 0) mixedPairs.push([males.pop()!, females.pop()!]);
-    const remaining = [...males, ...females];
-    const samePairs: Player[][] = [];
-    while (remaining.length >= 2) samePairs.push([remaining.pop()!, remaining.pop()!]);
-    const allPairs = [...mixedPairs, ...samePairs];
-    while (allPairs.length >= 2) {
-      const t1 = allPairs.pop()!;
-      const t2 = allPairs.pop()!;
-      matches.push(createMatch(t1[0], t1[1], t2[0], t2[1], mode));
-    }
-  } else if (mode === MatchmakingMode.FULL_RANDOM) {
-    const shuffled = shuffle(playersToPair);
+  } else {
     for (let i = 0; i < numMatches; i++) {
-      const p = shuffled.splice(0, 4);
+      const p = playersToPair.splice(0, 4);
       matches.push(createMatch(p[0], p[1], p[2], p[3], mode));
     }
   }
 
-  return {
-    id: Math.random().toString(36).substr(2, 9),
-    roundNumber,
-    matches,
-    restingPlayerIds: restingIds,
-    mode
-  };
+  return { id: Math.random().toString(36).substr(2, 9), roundNumber, matches, restingPlayerIds: restingIds, mode };
 };

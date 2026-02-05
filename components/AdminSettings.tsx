@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { AppSettings, Player, TrainingSession, AppSnapshot, MatchmakingMode, RankingMode, RankingSettings } from '../types';
+import { AppSettings, Player, TrainingSession, AppSnapshot, MatchmakingMode, RankingSettings, RankingModeParams } from '../types';
 import { createSnapshot, getSnapshots, getSnapshotContent } from '../services/storage';
 import { calculateNewRatings } from '../services/matchmaking';
 
@@ -20,19 +20,17 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
   const [selectedSnapshotData, setSelectedSnapshotData] = useState<AppSnapshot | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // Stato locale per le modifiche "DRAFT" al ranking
-  const [draftRanking, setDraftRanking] = useState<RankingSettings>(settings.ranking);
+  // Stato Draft con parametri separati
+  const [draftRanking, setDraftRanking] = useState<RankingSettings>(JSON.parse(JSON.stringify(settings.ranking)));
+  
+  // Tab attiva per l'editor draft
+  const [activeDraftTab, setActiveDraftTab] = useState<'classic' | 'proportional'>('classic');
 
-  // Stati per la simulazione Sandbox
+  // Sandbox states
   const [sandboxRankT1, setSandboxRankT1] = useState(2000);
   const [sandboxRankT2, setSandboxRankT2] = useState(2000);
   const [sandboxScoreT1, setSandboxScoreT1] = useState(21);
   const [sandboxScoreT2, setSandboxScoreT2] = useState(15);
-
-  // Reset draft se cambiano le settings dall'esterno (raro)
-  useEffect(() => {
-    setDraftRanking(settings.ranking);
-  }, [settings.ranking]);
 
   useEffect(() => {
     fetchSnapshots();
@@ -42,9 +40,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
     try {
       const data = await getSnapshots();
       setSnapshots(data);
-    } catch (e) {
-      console.error("Errore caricamento snapshots:", e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleBackup = async () => {
@@ -52,32 +48,15 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
     try {
       await createSnapshot(players, sessions, backupReason);
       await fetchSnapshots();
-      alert("Backup salvato con successo.");
-    } catch (e) {
-      alert("Errore durante il backup.");
-    } finally {
-      setIsBackingUp(false);
-    }
+      alert("Backup salvato.");
+    } finally { setIsBackingUp(false); }
   };
 
-  const handleViewSnapshot = async (id: string) => {
-    try {
-      const content = await getSnapshotContent(id);
-      setSelectedSnapshotData(content);
-    } catch (e) {
-      alert("Impossibile leggere lo snapshot.");
-    }
-  };
-
-  const toggleMatchmakingMode = (mode: MatchmakingMode) => {
-    const active = settings.activeMatchmakingModes.includes(mode)
-      ? settings.activeMatchmakingModes.filter(m => m !== mode)
-      : [...settings.activeMatchmakingModes, mode];
-    onUpdateSettings({ ...settings, activeMatchmakingModes: active });
-  };
-
-  const updateDraftRanking = (key: keyof RankingSettings, value: any) => {
-    setDraftRanking(prev => ({ ...prev, [key]: value }));
+  const updateDraftParam = (mode: 'classic' | 'proportional', key: keyof RankingModeParams, value: any) => {
+    setDraftRanking(prev => ({
+      ...prev,
+      [mode]: { ...prev[mode], [key]: value }
+    }));
   };
 
   const isSettingsDirty = useMemo(() => {
@@ -85,15 +64,18 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
   }, [draftRanking, settings.ranking]);
 
   const handleApplySettings = (recalculate: boolean) => {
-    onUpdateSettings({ ...settings, ranking: draftRanking });
+    // Aggiungiamo il timestamp di sistema al momento del salvataggio
+    onUpdateSettings({ 
+      ...settings, 
+      ranking: draftRanking,
+      lastUpdated: Date.now()
+    });
     setShowConfirmModal(false);
     if (recalculate && onRecalculateGlobal) {
-      // Usiamo setTimeout per assicurarci che lo stato delle settings sia propagato prima del ricalcolo
       setTimeout(() => onRecalculateGlobal(), 500);
     }
   };
 
-  // Calcoli Sandbox basati sul DRAFT
   const sandboxResults = useMemo(() => {
     const p1: Player = { id: 'p1', name: 'T1A', basePoints: sandboxRankT1/2, matchPoints: sandboxRankT1/2, wins: 0, losses: 0, gender: 'M', lastActive: 0 };
     const p2: Player = { id: 'p2', name: 'T1B', basePoints: sandboxRankT1/2, matchPoints: sandboxRankT1/2, wins: 0, losses: 0, gender: 'M', lastActive: 0 };
@@ -106,241 +88,242 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
     return { classic: classicRes, proportional: proportionalRes };
   }, [sandboxRankT1, sandboxRankT2, sandboxScoreT1, sandboxScoreT2, draftRanking]);
 
-  // Dati per il grafico basati sul DRAFT
-  const sensitivityData = useMemo(() => {
-    const margins = Array.from({ length: 22 }, (_, i) => i);
-    return margins.map(m => {
-      const kClassic = m >= draftRanking.classicBonusMargin ? draftRanking.kBase * draftRanking.bonusFactor : draftRanking.kBase;
-      const ratio = Math.min(m / draftRanking.maxPossibleMargin, 1);
-      const kProp = draftRanking.kBase * (1 + ratio * (draftRanking.bonusFactor - 1));
-      return { margin: m, kClassic, kProp };
-    });
-  }, [draftRanking]);
+  const lastUpdatedStr = settings.lastUpdated 
+    ? new Date(settings.lastUpdated).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : 'Mai aggiornato';
 
   return (
     <div className="max-w-6xl mx-auto space-y-12 pb-20">
       <div className="border-b border-slate-200 pb-6 flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 uppercase italic tracking-tighter">Technical Center</h2>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Configurazione Motore di Ranking</p>
+          <h2 className="text-3xl font-black text-slate-800 uppercase italic tracking-tighter">Ranking Lab</h2>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Configurazione e Simulazione Motore ELO</p>
         </div>
         {isSettingsDirty && (
           <button 
             onClick={() => setShowConfirmModal(true)}
-            className="bg-red-600 text-white px-8 py-3 rounded-2xl font-black uppercase text-[11px] tracking-widest shadow-xl animate-bounce"
+            className="bg-red-600 text-white px-8 py-3 rounded-2xl font-black uppercase text-[11px] tracking-widest shadow-xl shadow-red-100 animate-pulse border-2 border-white"
           >
-            Applica Modifiche
+            Salva in Produzione
           </button>
         )}
       </div>
 
-      <section className="bg-white rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden">
-        <div className="p-8 bg-slate-900 text-white">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="font-black text-xl uppercase italic tracking-widest">Ranking Configuration (Draft)</h3>
-              <p className="text-[10px] text-slate-400 uppercase font-bold mt-1 tracking-widest">Sperimenta i parametri prima di applicarli</p>
-            </div>
-            <div className="flex bg-white/10 p-1 rounded-xl">
-               <button 
-                onClick={() => updateDraftRanking('mode', 'CLASSIC')}
-                className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${draftRanking.mode === 'CLASSIC' ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}
-               >
-                 Classic
-               </button>
-               <button 
-                onClick={() => updateDraftRanking('mode', 'PROPORTIONAL')}
-                className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${draftRanking.mode === 'PROPORTIONAL' ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}
-               >
-                 Proportional
-               </button>
-            </div>
-          </div>
+      {/* --- SEZIONE PRODUZIONE (LIVE) --- */}
+      <section className="bg-slate-900 rounded-[2rem] p-8 text-white shadow-2xl relative overflow-hidden ring-4 ring-slate-200">
+        <div className="absolute top-0 right-0 p-8 opacity-10">
+           <span className="text-8xl font-black italic">LIVE</span>
         </div>
+        <div className="relative z-10 flex flex-col md:flex-row justify-between gap-8">
+           <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                 <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]"></div>
+                 <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Attualmente in Produzione</h3>
+              </div>
+              <div>
+                <div className="text-4xl font-black italic uppercase tracking-tighter text-red-500">{settings.ranking.mode} MODE</div>
+                <div className="text-[9px] font-bold text-slate-500 uppercase mt-1 tracking-widest">Ultimo salvataggio su database: <span className="text-white">{lastUpdatedStr}</span></div>
+              </div>
+           </div>
 
-        <div className="p-10 grid grid-cols-1 lg:grid-cols-12 gap-12">
-          <div className="lg:col-span-4 space-y-8">
-            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b pb-2">Parametri di Prova</h4>
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-black text-slate-700 uppercase">K-Base ({draftRanking.kBase})</label>
-                </div>
-                <input type="range" min="4" max="40" step="1" value={draftRanking.kBase} onChange={(e) => updateDraftRanking('kBase', parseInt(e.target.value))} className="w-full accent-red-600" />
+           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-sm">
+              <div>
+                 <div className="text-[8px] font-black text-slate-500 uppercase mb-1">K-Base</div>
+                 <div className="text-xl font-black">{settings.ranking.mode === 'CLASSIC' ? settings.ranking.classic.kBase : settings.ranking.proportional.kBase}</div>
               </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-black text-slate-700 uppercase">Bonus Factor ({draftRanking.bonusFactor}x)</label>
-                </div>
-                <input type="range" min="1" max="2.5" step="0.05" value={draftRanking.bonusFactor} onChange={(e) => updateDraftRanking('bonusFactor', parseFloat(e.target.value))} className="w-full accent-red-600" />
+              <div>
+                 <div className="text-[8px] font-black text-slate-500 uppercase mb-1">Bonus Factor</div>
+                 <div className="text-xl font-black">{settings.ranking.mode === 'CLASSIC' ? settings.ranking.classic.bonusFactor : settings.ranking.proportional.bonusFactor}x</div>
               </div>
-              {draftRanking.mode === 'PROPORTIONAL' ? (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-black text-slate-700 uppercase">Max Margin ({draftRanking.maxPossibleMargin})</label>
-                  </div>
-                  <input type="range" min="10" max="30" step="1" value={draftRanking.maxPossibleMargin} onChange={(e) => updateDraftRanking('maxPossibleMargin', parseInt(e.target.value))} className="w-full accent-red-600" />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-black text-slate-700 uppercase">Threshold ({draftRanking.classicBonusMargin})</label>
-                  </div>
-                  <input type="range" min="3" max="15" step="1" value={draftRanking.classicBonusMargin} onChange={(e) => updateDraftRanking('classicBonusMargin', parseInt(e.target.value))} className="w-full accent-red-600" />
-                </div>
-              )}
-            </div>
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 italic text-[9px] text-slate-400">
-              Questi parametri influenzano le simulazioni a destra e nel sandbox.
-            </div>
-          </div>
-
-          <div className="lg:col-span-8 space-y-10">
-            <div className="space-y-4">
-              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b pb-2">Analisi Sensibilità K</h4>
-              <div className="h-48 flex items-end gap-1 px-4 border-l border-b border-slate-100 relative">
-                {sensitivityData.map((d, i) => (
-                  <div key={i} className="flex-1 flex flex-col justify-end items-center group relative h-full">
-                    <div className={`w-full transition-all duration-300 z-10 ${draftRanking.mode === 'PROPORTIONAL' ? 'bg-red-500' : 'bg-slate-200'}`} style={{ height: `${(d.kProp/(draftRanking.kBase*draftRanking.bonusFactor))*100}%` }}></div>
-                    <div className={`w-full absolute bottom-0 border-t-2 border-slate-400 border-dashed transition-all duration-300 ${draftRanking.mode === 'CLASSIC' ? 'opacity-100' : 'opacity-20'}`} style={{ height: `${(d.kClassic/(draftRanking.kBase*draftRanking.bonusFactor))*100}%` }}></div>
-                    {i % 5 === 0 && <div className="absolute -bottom-6 text-[8px] font-bold text-slate-300">{i}</div>}
-                  </div>
-                ))}
+              <div>
+                 <div className="text-[8px] font-black text-slate-500 uppercase mb-1">Threshold / Margin</div>
+                 <div className="text-xl font-black">
+                    {settings.ranking.mode === 'CLASSIC' ? settings.ranking.classic.classicBonusMargin : settings.ranking.proportional.maxPossibleMargin}
+                 </div>
               </div>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest italic">Sandbox: Verifica Delta (Precisione Decimale)</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-3xl border border-slate-200">
-                <input type="number" value={sandboxRankT1} onChange={e => setSandboxRankT1(parseInt(e.target.value) || 0)} className="p-2 bg-white border border-slate-200 rounded-lg font-bold text-xs" placeholder="Rank T1" />
-                <input type="number" value={sandboxRankT2} onChange={e => setSandboxRankT2(parseInt(e.target.value) || 0)} className="p-2 bg-white border border-slate-200 rounded-lg font-bold text-xs" placeholder="Rank T2" />
-                <input type="number" value={sandboxScoreT1} onChange={e => setSandboxScoreT1(parseInt(e.target.value) || 0)} className="p-2 bg-white border border-slate-200 rounded-lg font-bold text-xs" placeholder="Punti T1" />
-                <input type="number" value={sandboxScoreT2} onChange={e => setSandboxScoreT2(parseInt(e.target.value) || 0)} className="p-2 bg-white border border-slate-200 rounded-lg font-bold text-xs" placeholder="Punti T2" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className={`p-4 rounded-2xl border-2 ${draftRanking.mode === 'CLASSIC' ? 'border-slate-800 bg-white' : 'border-slate-100 opacity-40'}`}>
-                  <div className="text-[8px] font-black uppercase text-slate-400">Classic Result</div>
-                  <div className="text-xl font-black text-slate-800">+{sandboxResults.classic.decimalDelta.toFixed(3)}</div>
-                  <div className="text-[8px] text-slate-400 uppercase mt-1">K: {sandboxResults.classic.kUsed.toFixed(2)}</div>
-                </div>
-                <div className={`p-4 rounded-2xl border-2 ${draftRanking.mode === 'PROPORTIONAL' ? 'border-red-600 bg-white' : 'border-slate-100 opacity-40'}`}>
-                  <div className="text-[8px] font-black uppercase text-red-500">Proportional Result</div>
-                  <div className="text-xl font-black text-red-600">+{sandboxResults.proportional.decimalDelta.toFixed(3)}</div>
-                  <div className="text-[8px] text-red-400 uppercase mt-1">K: {sandboxResults.proportional.kUsed.toFixed(2)}</div>
-                </div>
-              </div>
-            </div>
-          </div>
+           </div>
         </div>
       </section>
 
-      {/* Altre impostazioni */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        <section className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 space-y-8">
-           <h3 className="font-black text-xs text-slate-800 uppercase tracking-[0.2em] border-l-4 border-red-600 pl-3">Matchmaking & Stats</h3>
-           <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                <div className="text-xs font-black text-slate-700 uppercase">Creazione Manuale</div>
-                <button onClick={() => onUpdateSettings({ ...settings, allowManualSessionCreation: !settings.allowManualSessionCreation })} className={`w-10 h-5 rounded-full p-1 transition-all ${settings.allowManualSessionCreation ? 'bg-green-500' : 'bg-slate-300'}`}><div className={`w-3 h-3 bg-white rounded-full transition-transform ${settings.allowManualSessionCreation ? 'translate-x-5' : 'translate-x-0'}`}></div></button>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                <div className="text-xs font-black text-slate-700 uppercase">Stats Pubbliche</div>
-                <button onClick={() => onUpdateSettings({ ...settings, showStatsToAthletes: !settings.showStatsToAthletes })} className={`w-10 h-5 rounded-full p-1 transition-all ${settings.showStatsToAthletes ? 'bg-green-500' : 'bg-slate-300'}`}><div className={`w-3 h-3 bg-white rounded-full transition-transform ${settings.showStatsToAthletes ? 'translate-x-5' : 'translate-x-0'}`}></div></button>
-              </div>
-           </div>
-        </section>
+      {/* --- EDITOR DRAFT SEPARATO --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+         <section className="lg:col-span-5 bg-white rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden flex flex-col">
+            <div className="p-8 bg-slate-100 border-b border-slate-200">
+               <div className="flex justify-between items-center mb-6">
+                  <h3 className="font-black text-sm uppercase italic tracking-widest text-slate-800">Draft Editor</h3>
+                  <div className={`text-[8px] font-black px-2 py-1 rounded transition-colors ${isSettingsDirty ? 'bg-red-600 text-white' : 'bg-slate-300 text-slate-600'}`}>
+                    {isSettingsDirty ? 'MODIFICHE NON SALVATE' : 'SINCRO CON PROD'}
+                  </div>
+               </div>
+               
+               <div className="flex bg-slate-200 p-1 rounded-xl">
+                  <button 
+                    onClick={() => setActiveDraftTab('classic')}
+                    className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${activeDraftTab === 'classic' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
+                  >Classic Params</button>
+                  <button 
+                    onClick={() => setActiveDraftTab('proportional')}
+                    className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${activeDraftTab === 'proportional' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
+                  >Proportional Params</button>
+               </div>
+            </div>
 
-        <section className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 space-y-6">
-          <h3 className="font-black text-xs text-slate-800 uppercase tracking-[0.2em] border-l-4 border-slate-900 pl-3">Snapshot Manuale</h3>
-          <div className="flex gap-2">
-            <input type="text" value={backupReason} onChange={e => setBackupReason(e.target.value)} className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none" placeholder="Motivo backup..." />
-            <button onClick={handleBackup} disabled={isBackingUp} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-lg">{isBackingUp ? '...' : 'Backup'}</button>
-          </div>
-          <div className="max-h-40 overflow-y-auto space-y-2 no-scrollbar">
-            {snapshots.map(snap => (
-              <div key={snap.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center text-[10px]">
-                <span className="font-bold text-slate-600">{snap.reason}</span>
-                <button onClick={() => handleViewSnapshot(snap.id!)} className="text-red-600 font-black uppercase">Vedi</button>
-              </div>
-            ))}
-          </div>
-        </section>
+            <div className="p-8 flex-1 space-y-8">
+               <div className="space-y-6">
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-500 uppercase flex justify-between">
+                        K-Base (Base ELO) <span>{draftRanking[activeDraftTab].kBase}</span>
+                     </label>
+                     <input 
+                        type="range" min="4" max="40" step="1" 
+                        value={draftRanking[activeDraftTab].kBase} 
+                        onChange={e => updateDraftParam(activeDraftTab, 'kBase', parseInt(e.target.value))} 
+                        className="w-full accent-red-600" 
+                     />
+                  </div>
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-500 uppercase flex justify-between">
+                        Bonus Factor <span>{draftRanking[activeDraftTab].bonusFactor}x</span>
+                     </label>
+                     <input 
+                        type="range" min="1" max="2.5" step="0.05" 
+                        value={draftRanking[activeDraftTab].bonusFactor} 
+                        onChange={e => updateDraftParam(activeDraftTab, 'bonusFactor', parseFloat(e.target.value))} 
+                        className="w-full accent-red-600" 
+                     />
+                  </div>
+                  {activeDraftTab === 'classic' ? (
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase flex justify-between">
+                           Bonus Threshold (Margin) <span>{draftRanking.classic.classicBonusMargin}</span>
+                        </label>
+                        <input 
+                           type="range" min="3" max="15" step="1" 
+                           value={draftRanking.classic.classicBonusMargin} 
+                           onChange={e => updateDraftParam('classic', 'classicBonusMargin', parseInt(e.target.value))} 
+                           className="w-full accent-slate-800" 
+                        />
+                     </div>
+                  ) : (
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase flex justify-between">
+                           Max Saturation Margin <span>{draftRanking.proportional.maxPossibleMargin}</span>
+                        </label>
+                        <input 
+                           type="range" min="10" max="30" step="1" 
+                           value={draftRanking.proportional.maxPossibleMargin} 
+                           onChange={e => updateDraftParam('proportional', 'maxPossibleMargin', parseInt(e.target.value))} 
+                           className="w-full accent-red-600" 
+                        />
+                     </div>
+                  )}
+               </div>
+
+               <div className="pt-6 border-t border-slate-100">
+                  <label className="text-[10px] font-black text-slate-500 uppercase block mb-3">Modalità da attivare in produzione:</label>
+                  <div className="flex gap-2">
+                     <button 
+                        onClick={() => setDraftRanking(prev => ({ ...prev, mode: 'CLASSIC' }))}
+                        className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase transition-all ${draftRanking.mode === 'CLASSIC' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-100 text-slate-400'}`}
+                     >CLASSIC ACTIVE</button>
+                     <button 
+                        onClick={() => setDraftRanking(prev => ({ ...prev, mode: 'PROPORTIONAL' }))}
+                        className={`flex-1 py-3 rounded-xl border-2 font-black text-[10px] uppercase transition-all ${draftRanking.mode === 'PROPORTIONAL' ? 'border-red-600 bg-red-600 text-white shadow-lg shadow-red-50' : 'border-slate-100 text-slate-400'}`}
+                     >PROPORTIONAL ACTIVE</button>
+                  </div>
+               </div>
+            </div>
+         </section>
+
+         <section className="lg:col-span-7 bg-white rounded-[2.5rem] shadow-sm border border-slate-200 p-10 space-y-10">
+            <div>
+               <h3 className="font-black text-xs text-slate-800 uppercase tracking-[0.3em] border-l-4 border-red-600 pl-4 mb-2">Sandbox Simulator</h3>
+               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Testa l'impatto dei parametri bozza su un match ipotetico</p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-200">
+               <div className="space-y-1">
+                  <label className="text-[8px] font-black text-slate-400 uppercase">Avg Rank T1</label>
+                  <input type="number" value={sandboxRankT1} onChange={e => setSandboxRankT1(parseInt(e.target.value) || 0)} className="w-full p-2 bg-white border border-slate-200 rounded-lg font-black text-xs" />
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[8px] font-black text-slate-400 uppercase">Avg Rank T2</label>
+                  <input type="number" value={sandboxRankT2} onChange={e => setSandboxRankT2(parseInt(e.target.value) || 0)} className="w-full p-2 bg-white border border-slate-200 rounded-lg font-black text-xs" />
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[8px] font-black text-slate-400 uppercase">Score T1</label>
+                  <input type="number" value={sandboxScoreT1} onChange={e => setSandboxScoreT1(parseInt(e.target.value) || 0)} className="w-full p-2 bg-white border border-slate-200 rounded-lg font-black text-xs" />
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[8px] font-black text-slate-400 uppercase">Score T2</label>
+                  <input type="number" value={sandboxScoreT2} onChange={e => setSandboxScoreT2(parseInt(e.target.value) || 0)} className="w-full p-2 bg-white border border-slate-200 rounded-lg font-black text-xs" />
+               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-8">
+               <div className={`p-6 rounded-3xl border-2 transition-all relative ${draftRanking.mode === 'CLASSIC' ? 'border-slate-900 bg-white ring-4 ring-slate-100' : 'border-slate-100 opacity-40'}`}>
+                  {draftRanking.mode === 'CLASSIC' && <span className="absolute -top-3 left-6 bg-slate-900 text-white text-[7px] font-black px-2 py-1 rounded">PROD PREVIEW</span>}
+                  <div className="text-[9px] font-black uppercase text-slate-400 mb-2">Classic Result</div>
+                  <div className="text-3xl font-black text-slate-800">+{sandboxResults.classic.decimalDelta.toFixed(3)}</div>
+                  <div className="text-[8px] font-bold text-slate-400 uppercase mt-2">K: {sandboxResults.classic.kUsed.toFixed(2)}</div>
+               </div>
+               <div className={`p-6 rounded-3xl border-2 transition-all relative ${draftRanking.mode === 'PROPORTIONAL' ? 'border-red-600 bg-white ring-4 ring-red-50 shadow-xl' : 'border-slate-100 opacity-40'}`}>
+                  {draftRanking.mode === 'PROPORTIONAL' && <span className="absolute -top-3 left-6 bg-red-600 text-white text-[7px] font-black px-2 py-1 rounded">PROD PREVIEW</span>}
+                  <div className="text-[9px] font-black uppercase text-red-500 mb-2">Proportional Result</div>
+                  <div className="text-3xl font-black text-red-600">+{sandboxResults.proportional.decimalDelta.toFixed(3)}</div>
+                  <div className="text-[8px] font-bold text-red-400 uppercase mt-2">K: {sandboxResults.proportional.kUsed.toFixed(2)}</div>
+               </div>
+            </div>
+
+            <div className="p-6 bg-slate-900 rounded-[2rem] text-white">
+               <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-4">Sensitivity curve (K vs Margin)</h4>
+               <div className="h-40 flex items-end gap-1 border-l border-b border-white/5 px-2 relative">
+                  {Array.from({length: 22}).map((_, i) => {
+                     const ratio = Math.min(i / (draftRanking.proportional.maxPossibleMargin || 21), 1);
+                     const kProp = draftRanking.proportional.kBase * (1 + ratio * (draftRanking.proportional.bonusFactor - 1));
+                     const kClassic = i >= (draftRanking.classic.classicBonusMargin || 7) ? draftRanking.classic.kBase * draftRanking.classic.bonusFactor : draftRanking.classic.kBase;
+                     
+                     const hProp = (kProp / (draftRanking.proportional.kBase * 2.5)) * 100;
+                     const hClassic = (kClassic / (draftRanking.proportional.kBase * 2.5)) * 100;
+
+                     return (
+                        <div key={i} className="flex-1 flex flex-col justify-end items-center group relative h-full">
+                           <div className={`w-full ${draftRanking.mode === 'PROPORTIONAL' ? 'bg-red-500' : 'bg-slate-700'}`} style={{ height: `${hProp}%` }}></div>
+                           <div className={`w-full absolute bottom-0 border-t border-white/40 border-dashed ${draftRanking.mode === 'CLASSIC' ? 'opacity-100' : 'opacity-20'}`} style={{ height: `${hClassic}%` }}></div>
+                           {i % 5 === 0 && <span className="absolute -bottom-6 text-[7px] font-bold text-slate-600">{i}</span>}
+                        </div>
+                     )
+                  })}
+               </div>
+            </div>
+         </section>
       </div>
 
-      {/* MODAL CONFERMA CAMBIO RANKING */}
+      {/* CONFIRMATION MODAL */}
       {showConfirmModal && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden p-10 space-y-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">⚠️</div>
-              <h4 className="font-black text-2xl text-slate-800 uppercase italic tracking-tighter">Conferma Nuovi Parametri</h4>
-              <p className="text-slate-400 text-sm font-bold uppercase mt-2">Riepilogo delle modifiche al motore</p>
-            </div>
-
-            <div className="space-y-4 bg-slate-50 p-6 rounded-3xl border border-slate-200">
-               <div className="flex justify-between text-xs">
-                 <span className="text-slate-400 uppercase font-black">Modalità</span>
-                 <span className="font-black text-slate-800">{settings.ranking.mode} ➔ {draftRanking.mode}</span>
-               </div>
-               <div className="flex justify-between text-xs">
-                 <span className="text-slate-400 uppercase font-black">K-Base</span>
-                 <span className="font-black text-slate-800">{settings.ranking.kBase} ➔ {draftRanking.kBase}</span>
-               </div>
-               <div className="flex justify-between text-xs">
-                 <span className="text-slate-400 uppercase font-black">Bonus Factor</span>
-                 <span className="font-black text-slate-800">{settings.ranking.bonusFactor}x ➔ {draftRanking.bonusFactor}x</span>
-               </div>
-               <div className="flex justify-between text-xs">
-                 <span className="text-slate-400 uppercase font-black">Margine Max / Threshold</span>
-                 <span className="font-black text-slate-800">
-                   {draftRanking.mode === 'PROPORTIONAL' ? draftRanking.maxPossibleMargin : draftRanking.classicBonusMargin}
-                 </span>
-               </div>
-            </div>
-
-            <div className="space-y-3">
-               <p className="text-[10px] text-slate-400 font-bold uppercase text-center leading-relaxed">
-                 Queste impostazioni influenzeranno tutti i futuri match. Vuoi ricalcolare anche l'intero storico per aggiornare l'attuale classifica?
-               </p>
-               <div className="flex flex-col gap-2">
-                 <button 
-                  onClick={() => handleApplySettings(true)}
-                  className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-red-200 hover:bg-red-700 transition-all"
-                 >
-                   Applica e Ricalcola Storico
-                 </button>
-                 <button 
-                  onClick={() => handleApplySettings(false)}
-                  className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-black transition-all"
-                 >
-                   Applica solo ai match futuri
-                 </button>
-                 <button 
-                  onClick={() => setShowConfirmModal(false)}
-                  className="w-full text-slate-400 font-black uppercase text-[10px] tracking-widest py-2"
-                 >
-                   Annulla
-                 </button>
-               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ISPEZIONE SNAPSHOT (Pre-esistente) */}
-      {selectedSnapshotData && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[201] flex items-center justify-center p-6">
-           <div className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-              <div className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                 <h4 className="font-black text-slate-800 uppercase italic">Ispezione Snapshot</h4>
-                 <button onClick={() => setSelectedSnapshotData(null)} className="text-slate-400 font-bold">✕</button>
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-xl z-[300] flex items-center justify-center p-6 animate-in fade-in duration-500">
+           <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl p-12 text-center space-y-8 animate-in zoom-in-95 duration-300">
+              <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto text-3xl shadow-inner italic font-black">!</div>
+              <div>
+                 <h4 className="text-2xl font-black text-slate-800 uppercase italic tracking-tighter">Pubblicazione Ranking</h4>
+                 <p className="text-slate-400 text-xs font-bold uppercase mt-2">Stai per sovrascrivere i parametri di produzione</p>
               </div>
-              <div className="p-6 overflow-y-auto flex-1">
-                 <pre className="text-[10px] text-slate-400 font-mono bg-slate-900 p-4 rounded-xl">{JSON.stringify(selectedSnapshotData.data, null, 2)}</pre>
+
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-200 text-left">
+                 <div className="space-y-1">
+                    <span className="text-[8px] font-black text-slate-400 uppercase">Nuova Modalità</span>
+                    <div className="text-sm font-black text-red-600 uppercase italic">{draftRanking.mode}</div>
+                 </div>
+                 <div className="space-y-1">
+                    <span className="text-[8px] font-black text-slate-400 uppercase">K-Base (Attivo)</span>
+                    <div className="text-sm font-black text-slate-800">{draftRanking[draftRanking.mode === 'CLASSIC' ? 'classic' : 'proportional'].kBase}</div>
+                 </div>
               </div>
-              <div className="p-6 bg-slate-50 border-t border-slate-200 flex gap-2">
-                 <button onClick={() => setSelectedSnapshotData(null)} className="flex-1 px-8 py-3 bg-white border border-slate-200 rounded-xl font-black text-[10px] text-slate-600 uppercase">Chiudi</button>
-                 <button onClick={() => { onRestoreSnapshot(selectedSnapshotData.data.players, selectedSnapshotData.data.sessions); setSelectedSnapshotData(null); }} className="flex-[2] px-8 py-3 bg-red-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-red-700">Ripristina Stato</button>
+
+              <div className="space-y-3">
+                 <button onClick={() => handleApplySettings(true)} className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-red-100 hover:bg-red-700 transition-all">Applica e Ricalcola Storico</button>
+                 <button onClick={() => handleApplySettings(false)} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-black transition-all">Applica solo match futuri</button>
+                 <button onClick={() => setShowConfirmModal(false)} className="w-full py-2 text-slate-400 font-black uppercase text-[10px] tracking-widest">Torna al laboratorio</button>
               </div>
            </div>
         </div>

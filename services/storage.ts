@@ -22,29 +22,48 @@ export const loadSettings = async (): Promise<AppSettings> => {
     adminUICompactMode: false,
     ranking: {
       mode: 'CLASSIC',
-      kBase: 12,
-      bonusFactor: 1.25,
-      maxPossibleMargin: 21,
-      classicBonusMargin: 7
+      classic: {
+        kBase: 12,
+        bonusFactor: 1.25,
+        classicBonusMargin: 7
+      },
+      proportional: {
+        kBase: 12,
+        bonusFactor: 1.25,
+        maxPossibleMargin: 21
+      }
     }
   };
 
   if (!supabase) return defaultSettings;
 
-  const { data, error } = await supabase.from('app_settings').select('settings').eq('id', 'main').single();
+  const { data, error } = await supabase.from('app_settings').select('settings, updated_at').eq('id', 'main').single();
   if (error || !data) return defaultSettings;
   
-  // Merge con default per gestire nuove chiavi (migrazione)
+  const saved = data.settings;
+  // Convertiamo il timestamp di database in formato compatibile con lastUpdated se necessario
+  const lastUpdated = data.updated_at ? new Date(data.updated_at).getTime() : undefined;
+
   return {
     ...defaultSettings,
-    ...data.settings,
-    ranking: { ...defaultSettings.ranking, ...data.settings.ranking }
+    ...saved,
+    lastUpdated: saved.lastUpdated || lastUpdated,
+    ranking: {
+      ...defaultSettings.ranking,
+      ...saved.ranking,
+      classic: { ...defaultSettings.ranking.classic, ...(saved.ranking?.classic || {}) },
+      proportional: { ...defaultSettings.ranking.proportional, ...(saved.ranking?.proportional || {}) }
+    }
   };
 };
 
 export const saveSettingsToDB = async (settings: AppSettings) => {
   if (!supabase) return;
-  const { error } = await supabase.from('app_settings').upsert({ id: 'main', settings, updated_at: new Date().toISOString() });
+  const { error } = await supabase.from('app_settings').upsert({ 
+    id: 'main', 
+    settings, 
+    updated_at: new Date().toISOString() 
+  });
   if (error) throw error;
 };
 

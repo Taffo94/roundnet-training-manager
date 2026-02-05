@@ -25,12 +25,17 @@ export enum MatchmakingMode {
 
 export type RankingMode = 'CLASSIC' | 'PROPORTIONAL';
 
-export interface RankingSettings {
-  mode: RankingMode;
+export interface RankingModeParams {
   kBase: number;
   bonusFactor: number;
-  maxPossibleMargin: number; // Solo per Proportional
-  classicBonusMargin: number; // Solo per Classic
+  maxPossibleMargin?: number;
+  classicBonusMargin?: number;
+}
+
+export interface RankingSettings {
+  mode: RankingMode;
+  classic: RankingModeParams;
+  proportional: RankingModeParams;
 }
 
 export interface AppSettings {
@@ -39,6 +44,7 @@ export interface AppSettings {
   showStatsToAthletes: boolean;
   adminUICompactMode: boolean;
   ranking: RankingSettings;
+  lastUpdated?: number; // Timestamp dell'ultima modifica
 }
 
 export interface AppSnapshot {
