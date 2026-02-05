@@ -43,8 +43,7 @@ export const calculateNewRatings = (
   p3: Player, p4: Player, 
   score1: number, score2: number,
   rankingSettings?: RankingSettings
-): { players: Player[], delta: number, individualDeltas: Record<string, number>, kUsed: number } => {
-  // Default fallback se settings non passati
+): { players: Player[], delta: number, decimalDelta: number, individualDeltas: Record<string, number>, kUsed: number } => {
   const config = rankingSettings || {
     mode: 'CLASSIC',
     kBase: 12,
@@ -57,11 +56,9 @@ export const calculateNewRatings = (
   let kEff = config.kBase;
 
   if (config.mode === 'PROPORTIONAL') {
-    // kEff = K_BASE * (1 + (margin / maxPossibleMargin) * (BONUS_FACTOR - 1))
     const ratio = Math.min(margin / config.maxPossibleMargin, 1);
     kEff = config.kBase * (1 + ratio * (config.bonusFactor - 1));
   } else {
-    // Modalità Classic (attuale)
     kEff = margin >= config.classicBonusMargin ? config.kBase * config.bonusFactor : config.kBase;
   }
 
@@ -83,11 +80,6 @@ export const calculateNewRatings = (
   const deltaP3 = kEff * (resultS2 - getExpectedScore(eloP3, avgOppS2));
   const deltaP4 = kEff * (resultS2 - getExpectedScore(eloP4, avgOppS2));
 
-  const isWinS1 = score1 > score2 ? 1 : 0;
-  const isWinS2 = score2 > score1 ? 1 : 0;
-  const isLossS1 = score2 > score1 ? 1 : 0;
-  const isLossS2 = score1 > score2 ? 1 : 0;
-
   const individualDeltas: Record<string, number> = {
     [p1.id]: deltaP1,
     [p2.id]: deltaP2,
@@ -95,9 +87,17 @@ export const calculateNewRatings = (
     [p4.id]: deltaP4
   };
 
+  const isWinS1 = score1 > score2 ? 1 : 0;
+  const isWinS2 = score2 > score1 ? 1 : 0;
+  const isLossS1 = score2 > score1 ? 1 : 0;
+  const isLossS2 = score1 > score2 ? 1 : 0;
+
+  const rawDelta = resultS1 >= 0.5 ? deltaP1 : deltaP3;
+
   return {
     kUsed: kEff,
-    delta: Math.round(resultS1 >= 0.5 ? deltaP1 : deltaP3), 
+    delta: Math.round(rawDelta), 
+    decimalDelta: rawDelta,
     individualDeltas,
     players: [
       { ...p1, matchPoints: p1.matchPoints + deltaP1, wins: p1.wins + isWinS1, losses: p1.losses + isLossS1 },

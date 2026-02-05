@@ -105,7 +105,6 @@ const App: React.FC = () => {
 
   const recalculateAllPoints = async () => {
     if (!state) return;
-    if (!window.confirm("Attenzione: Questa operazione azzererà tutti i Match Points e ricalcolerà l'intera classifica basandosi cronologicamente su tutti gli allenamenti archiviati. Procedere?")) return;
     
     setIsSyncing(true);
     let updatedPlayers = state.players.map(p => ({ ...p, matchPoints: 0, wins: 0, losses: 0 }));
@@ -133,7 +132,6 @@ const App: React.FC = () => {
     setState({ ...state, players: updatedPlayers });
     await savePlayersToDB(updatedPlayers);
     setIsSyncing(false);
-    alert("Ricalcolo completato con successo!");
   };
 
   const activeSession = state?.sessions.find(s => s.status === 'ACTIVE');
@@ -295,6 +293,7 @@ const App: React.FC = () => {
                 setState(p => p ? ({ ...p, players, sessions, currentTab: 'ranking' }) : null);
               }
             }}
+            onRecalculateGlobal={recalculateAllPoints}
           />
         )}
       </main>
