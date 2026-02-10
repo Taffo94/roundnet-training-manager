@@ -114,7 +114,8 @@ export const generateRound = (
   allParticipants.forEach(p => restCounts[p.id] = 0);
   previousRounds.forEach(r => r.restingPlayerIds.forEach(id => { if(restCounts[id] !== undefined) restCounts[id]++; }));
 
-  const pool = [...allParticipants];
+  // Shuffle pool to randomize resting players when counts are tied
+  const pool = shuffle([...allParticipants]);
   const sortedByRest = [...pool].sort((a, b) => restCounts[a.id] - restCounts[b.id]);
   const restingIds = numResting > 0 ? sortedByRest.slice(0, numResting).map(p => p.id) : [];
   const activePlayers = pool.filter(p => !restingIds.includes(p.id));
@@ -126,24 +127,46 @@ export const generateRound = (
   if (mode === MatchmakingMode.CUSTOM) {
     for (let i = 0; i < numMatches; i++) matches.push(createMatch({id:''},{id:''},{id:''},{id:''}, mode));
   } else if (mode === MatchmakingMode.SAME_LEVEL) {
+    // Sort by skill, but randomize partners within the same skill block
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
     for (let i = 0; i < numMatches; i++) {
       const block = playersToPair.splice(0, 4);
-      const [p1, p2, p3, p4] = block;
+      const shuffledBlock = shuffle(block);
+      const [p1, p2, p3, p4] = shuffledBlock;
       matches.push(createMatch(p1, p2, p3, p4, mode));
     }
   } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
+    // Sort by skill
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
-    while (playersToPair.length >= 4) {
-      const top = playersToPair.shift()!;
-      const bottom = playersToPair.pop()!;
-      const p1 = playersToPair.shift()!;
-      const p2 = playersToPair.pop()!;
-      matches.push(createMatch(top, bottom, p1, p2, mode));
+    
+    // Split into Top and Bottom halves
+    const half = Math.floor(playersToPair.length / 2);
+    const topHalf = playersToPair.slice(0, half);
+    const bottomHalf = playersToPair.slice(half);
+
+    // Shuffle both halves to randomize partners while keeping High-Low structure
+    const shuffledTop = shuffle(topHalf);
+    const shuffledBottom = shuffle(bottomHalf);
+    
+    // Create Teams (One from Top, One from Bottom)
+    const teams: Player[][] = [];
+    while (shuffledTop.length > 0 && shuffledBottom.length > 0) {
+      teams.push([shuffledTop.pop()!, shuffledBottom.pop()!]);
+    }
+
+    // Shuffle teams to randomize matchups
+    const shuffledTeams = shuffle(teams);
+    
+    while (shuffledTeams.length >= 2) {
+      const t1 = shuffledTeams.pop()!;
+      const t2 = shuffledTeams.pop()!;
+      matches.push(createMatch(t1[0], t1[1], t2[0], t2[1], mode));
     }
   } else {
+    // FULL_RANDOM or others
+    const shuffled = shuffle(playersToPair);
     for (let i = 0; i < numMatches; i++) {
-      const p = playersToPair.splice(0, 4);
+      const p = shuffled.splice(0, 4);
       matches.push(createMatch(p[0], p[1], p[2], p[3], mode));
     }
   }
