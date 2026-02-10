@@ -136,7 +136,7 @@ export const generateRound = (
       matches.push(createMatch(p1, p2, p3, p4, mode));
     }
   } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
-    // 1. Sort by skill (Desc)
+    // 1. Sort by skill (Desc) to create pools
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
     
     // 2. Split into Top and Bottom halves
@@ -144,30 +144,86 @@ export const generateRound = (
     const topHalf = playersToPair.slice(0, half);
     const bottomHalf = playersToPair.slice(half);
 
-    // 3. Shuffle both halves to randomize partners while keeping High-Low structure
-    const shuffledTop = shuffle(topHalf);
-    const shuffledBottom = shuffle(bottomHalf);
-    
-    // 4. Create Teams (One from Top, One from Bottom) with calculated total score
-    const teams: { players: [Player, Player], total: number }[] = [];
-    while (shuffledTop.length > 0 && shuffledBottom.length > 0) {
-      const p1 = shuffledTop.pop()!;
-      const p2 = shuffledBottom.pop()!;
-      teams.push({
-        players: [p1, p2],
-        total: getTot(p1) + getTot(p2)
-      });
+    // Loop to create matches one by one
+    while (topHalf.length > 0 && bottomHalf.length > 0) {
+      // --- STEP 1: FORM TEAM A (Random P1 + Random P2) ---
+      
+      // A. Pick random Strong player
+      const p1Index = Math.floor(Math.random() * topHalf.length);
+      const p1 = topHalf[p1Index];
+      topHalf.splice(p1Index, 1);
+
+      // B. Find a Weak partner (Preference: hasn't played with p1)
+      let p2Index = -1;
+      const shuffledBottom = shuffle(bottomHalf.map((p, i) => ({p, i, origIndex: i}))); // Shuffle to pick random
+      
+      // Try to find one that hasn't played with p1
+      const validPartner = shuffledBottom.find(item => getPartnershipCount(p1.id, item.p.id, previousRounds) === 0);
+      
+      if (validPartner) {
+        // Find the index in the current bottomHalf array
+        p2Index = bottomHalf.findIndex(p => p.id === validPartner.p.id);
+      } else {
+        // Fallback: Just pick the first random one available
+        const fallback = shuffledBottom[0];
+        p2Index = bottomHalf.findIndex(p => p.id === fallback.p.id);
+      }
+
+      const p2 = bottomHalf[p2Index];
+      bottomHalf.splice(p2Index, 1);
+      
+      const teamAScore = getTot(p1) + getTot(p2);
+
+
+      // --- STEP 2: FORM TEAM B (Closest Score to Team A) ---
+      
+      // We need to pick one remaining Strong and one remaining Weak
+      // such that their sum is closest to teamAScore.
+      // Priority: 1. Haven't played together, 2. Score similarity
+      
+      let bestPair = { tIdx: -1, bIdx: -1, diff: Infinity, playedBefore: true };
+      
+      // Brute force search remaining pairs (list is small, max 20x20 iterations)
+      for (let t = 0; t < topHalf.length; t++) {
+        for (let b = 0; b < bottomHalf.length; b++) {
+           const pStrong = topHalf[t];
+           const pWeak = bottomHalf[b];
+           const score = getTot(pStrong) + getTot(pWeak);
+           const diff = Math.abs(score - teamAScore);
+           const played = getPartnershipCount(pStrong.id, pWeak.id, previousRounds) > 0;
+
+           if (bestPair.tIdx === -1) {
+              bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
+              continue;
+           }
+
+           // Priority Logic
+           if (bestPair.playedBefore && !played) {
+              // Found a pair that hasn't played -> Prioritize immediately
+              bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
+           } else if (bestPair.playedBefore === played) {
+              // If both played or both didn't play -> Check score diff
+              if (diff < bestPair.diff) {
+                 bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
+              }
+           }
+        }
+      }
+
+      if (bestPair.tIdx !== -1) {
+        const p3 = topHalf[bestPair.tIdx];
+        const p4 = bottomHalf[bestPair.bIdx];
+        
+        topHalf.splice(bestPair.tIdx, 1);
+        bottomHalf.splice(bestPair.bIdx, 1);
+
+        matches.push(createMatch(p1, p2, p3, p4, mode));
+      } else {
+        // Should effectively never happen unless arrays are empty
+        console.warn("Could not pair opponents in BALANCED_PAIRS");
+      }
     }
 
-    // 5. Sort teams by Total ELO to ensure closest matchups
-    teams.sort((a, b) => b.total - a.total);
-    
-    // 6. Pair adjacent teams
-    while (teams.length >= 2) {
-      const t1 = teams.shift()!;
-      const t2 = teams.shift()!;
-      matches.push(createMatch(t1.players[0], t1.players[1], t2.players[0], t2.players[1], mode));
-    }
   } else {
     // FULL_RANDOM or others
     const shuffled = shuffle(playersToPair);
