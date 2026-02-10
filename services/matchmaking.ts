@@ -136,31 +136,37 @@ export const generateRound = (
       matches.push(createMatch(p1, p2, p3, p4, mode));
     }
   } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
-    // Sort by skill
+    // 1. Sort by skill (Desc)
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
     
-    // Split into Top and Bottom halves
+    // 2. Split into Top and Bottom halves
     const half = Math.floor(playersToPair.length / 2);
     const topHalf = playersToPair.slice(0, half);
     const bottomHalf = playersToPair.slice(half);
 
-    // Shuffle both halves to randomize partners while keeping High-Low structure
+    // 3. Shuffle both halves to randomize partners while keeping High-Low structure
     const shuffledTop = shuffle(topHalf);
     const shuffledBottom = shuffle(bottomHalf);
     
-    // Create Teams (One from Top, One from Bottom)
-    const teams: Player[][] = [];
+    // 4. Create Teams (One from Top, One from Bottom) with calculated total score
+    const teams: { players: [Player, Player], total: number }[] = [];
     while (shuffledTop.length > 0 && shuffledBottom.length > 0) {
-      teams.push([shuffledTop.pop()!, shuffledBottom.pop()!]);
+      const p1 = shuffledTop.pop()!;
+      const p2 = shuffledBottom.pop()!;
+      teams.push({
+        players: [p1, p2],
+        total: getTot(p1) + getTot(p2)
+      });
     }
 
-    // Shuffle teams to randomize matchups
-    const shuffledTeams = shuffle(teams);
+    // 5. Sort teams by Total ELO to ensure closest matchups
+    teams.sort((a, b) => b.total - a.total);
     
-    while (shuffledTeams.length >= 2) {
-      const t1 = shuffledTeams.pop()!;
-      const t2 = shuffledTeams.pop()!;
-      matches.push(createMatch(t1[0], t1[1], t2[0], t2[1], mode));
+    // 6. Pair adjacent teams
+    while (teams.length >= 2) {
+      const t1 = teams.shift()!;
+      const t2 = teams.shift()!;
+      matches.push(createMatch(t1.players[0], t1.players[1], t2.players[0], t2.players[1], mode));
     }
   } else {
     // FULL_RANDOM or others
