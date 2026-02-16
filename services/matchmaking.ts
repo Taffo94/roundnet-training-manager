@@ -44,7 +44,6 @@ export const calculateNewRatings = (
   score1: number, score2: number,
   rankingSettings?: RankingSettings
 ): { players: Player[], delta: number, decimalDelta: number, individualDeltas: Record<string, number>, kUsed: number } => {
-  // Default values se mancano le settings
   const config = rankingSettings || {
     mode: 'CLASSIC',
     classic: { kBase: 12, bonusFactor: 1.25, classicBonusMargin: 7 },
@@ -114,7 +113,6 @@ export const generateRound = (
   allParticipants.forEach(p => restCounts[p.id] = 0);
   previousRounds.forEach(r => r.restingPlayerIds.forEach(id => { if(restCounts[id] !== undefined) restCounts[id]++; }));
 
-  // Shuffle pool to randomize resting players when counts are tied
   const pool = shuffle([...allParticipants]);
   const sortedByRest = [...pool].sort((a, b) => restCounts[a.id] - restCounts[b.id]);
   const restingIds = numResting > 0 ? sortedByRest.slice(0, numResting).map(p => p.id) : [];
@@ -127,63 +125,64 @@ export const generateRound = (
   if (mode === MatchmakingMode.CUSTOM) {
     for (let i = 0; i < numMatches; i++) matches.push(createMatch({id:''},{id:''},{id:''},{id:''}, mode));
   } else if (mode === MatchmakingMode.SAME_LEVEL) {
-    // Sort by skill, but randomize partners within the same skill block
+    // Sort by skill blocks
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
+    
     for (let i = 0; i < numMatches; i++) {
       const block = playersToPair.splice(0, 4);
-      const shuffledBlock = shuffle(block);
-      const [p1, p2, p3, p4] = shuffledBlock;
+      // Within this block of 4, try to find pairs that haven't played together
+      // Combinations of 4 players [0,1,2,3]:
+      // 1: (0,1) vs (2,3)
+      // 2: (0,2) vs (1,3)
+      // 3: (0,3) vs (1,2)
+      const combos = [
+        [0, 1, 2, 3],
+        [0, 2, 1, 3],
+        [0, 3, 1, 2]
+      ];
+      
+      let bestCombo = combos[0];
+      let minConflicts = Infinity;
+
+      for (const combo of combos) {
+        const c1 = getPartnershipCount(block[combo[0]].id, block[combo[1]].id, previousRounds);
+        const c2 = getPartnershipCount(block[combo[2]].id, block[combo[3]].id, previousRounds);
+        if (c1 + c2 < minConflicts) {
+          minConflicts = c1 + c2;
+          bestCombo = combo;
+        }
+      }
+
+      const p1 = block[bestCombo[0]], p2 = block[bestCombo[1]], p3 = block[bestCombo[2]], p4 = block[bestCombo[3]];
       matches.push(createMatch(p1, p2, p3, p4, mode));
     }
   } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
-    // 1. Sort by skill (Desc) to create pools
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
-    
-    // 2. Split into Top and Bottom halves
     const half = Math.floor(playersToPair.length / 2);
     const topHalf = playersToPair.slice(0, half);
     const bottomHalf = playersToPair.slice(half);
 
-    // Loop to create matches one by one
     while (topHalf.length > 0 && bottomHalf.length > 0) {
-      // --- STEP 1: FORM TEAM A (Random P1 + Random P2) ---
-      
-      // A. Pick random Strong player
       const p1Index = Math.floor(Math.random() * topHalf.length);
       const p1 = topHalf[p1Index];
       topHalf.splice(p1Index, 1);
 
-      // B. Find a Weak partner (Preference: hasn't played with p1)
       let p2Index = -1;
-      const shuffledBottom = shuffle(bottomHalf.map((p, i) => ({p, i, origIndex: i}))); // Shuffle to pick random
-      
-      // Try to find one that hasn't played with p1
+      const shuffledBottom = shuffle(bottomHalf.map((p, i) => ({p, i, origIndex: i})));
       const validPartner = shuffledBottom.find(item => getPartnershipCount(p1.id, item.p.id, previousRounds) === 0);
       
       if (validPartner) {
-        // Find the index in the current bottomHalf array
         p2Index = bottomHalf.findIndex(p => p.id === validPartner.p.id);
       } else {
-        // Fallback: Just pick the first random one available
         const fallback = shuffledBottom[0];
         p2Index = bottomHalf.findIndex(p => p.id === fallback.p.id);
       }
 
       const p2 = bottomHalf[p2Index];
       bottomHalf.splice(p2Index, 1);
-      
       const teamAScore = getTot(p1) + getTot(p2);
 
-
-      // --- STEP 2: FORM TEAM B (Closest Score to Team A) ---
-      
-      // We need to pick one remaining Strong and one remaining Weak
-      // such that their sum is closest to teamAScore.
-      // Priority: 1. Haven't played together, 2. Score similarity
-      
       let bestPair = { tIdx: -1, bIdx: -1, diff: Infinity, playedBefore: true };
-      
-      // Brute force search remaining pairs (list is small, max 20x20 iterations)
       for (let t = 0; t < topHalf.length; t++) {
         for (let b = 0; b < bottomHalf.length; b++) {
            const pStrong = topHalf[t];
@@ -197,12 +196,9 @@ export const generateRound = (
               continue;
            }
 
-           // Priority Logic
            if (bestPair.playedBefore && !played) {
-              // Found a pair that hasn't played -> Prioritize immediately
               bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
            } else if (bestPair.playedBefore === played) {
-              // If both played or both didn't play -> Check score diff
               if (diff < bestPair.diff) {
                  bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
               }
@@ -213,25 +209,17 @@ export const generateRound = (
       if (bestPair.tIdx !== -1) {
         const p3 = topHalf[bestPair.tIdx];
         const p4 = bottomHalf[bestPair.bIdx];
-        
         topHalf.splice(bestPair.tIdx, 1);
         bottomHalf.splice(bestPair.bIdx, 1);
-
         matches.push(createMatch(p1, p2, p3, p4, mode));
-      } else {
-        // Should effectively never happen unless arrays are empty
-        console.warn("Could not pair opponents in BALANCED_PAIRS");
       }
     }
-
   } else {
-    // FULL_RANDOM or others
     const shuffled = shuffle(playersToPair);
     for (let i = 0; i < numMatches; i++) {
       const p = shuffled.splice(0, 4);
       matches.push(createMatch(p[0], p[1], p[2], p[3], mode));
     }
   }
-
   return { id: Math.random().toString(36).substr(2, 9), roundNumber, matches, restingPlayerIds: restingIds, mode };
 };

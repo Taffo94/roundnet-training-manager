@@ -66,10 +66,11 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
     data.push(['Atleti presenti', session.participantIds.length]);
     data.push(['Round totali', session.rounds.length]);
     data.push([]);
-    data.push(['Round', 'Giocatore 1 T1', 'Giocatore 2 T1', 'Giocatore 1 T2', 'Giocatore 2 T2', 'Punteggio T1', 'Punteggio T2', 'Modalità']);
+    data.push(['Round', 'Giocatore 1 T1', 'Giocatore 2 T1', 'Giocatore 1 T2', 'Giocatore 2 T2', 'Punteggio T1', 'Punteggio T2', 'Modalità', 'In Pausa']);
     
     session.rounds.forEach(round => {
-      round.matches.forEach(match => {
+      const restingPlayers = round.restingPlayerIds.map(id => getPlayerName(id)).join(', ');
+      round.matches.forEach((match, mIdx) => {
         data.push([
           round.roundNumber,
           getPlayerName(match.team1.playerIds[0]),
@@ -78,13 +79,14 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
           getPlayerName(match.team2.playerIds[1]),
           match.status === 'COMPLETED' ? match.team1.score : '',
           match.status === 'COMPLETED' ? match.team2.score : '',
-          round.mode.replace('_', ' ')
+          round.mode.replace('_', ' '),
+          mIdx === 0 ? restingPlayers : ''
         ]);
       });
     });
     
     const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [{ wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 20 }];
+    ws['!cols'] = [{ wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 30 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Training Report');
     XLSX.writeFile(wb, `RMI_Report_${new Date(session.date).toISOString().split('T')[0]}.xlsx`);
@@ -135,6 +137,12 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                 </div>
               `;
             }).join('')}
+            ${r.restingPlayerIds.length > 0 ? `
+              <div style="margin-top: 10px; padding: 8px 15px; background: #fffbeb; border: 1px dashed #fcd34d; border-radius: 10px; font-size: 11px;">
+                <span style="font-weight: 900; text-transform: uppercase; color: #d97706; margin-right: 10px;">In Pausa:</span>
+                <span style="color: #92400e; font-weight: 700;">${r.restingPlayerIds.map(id => getPlayerName(id)).join(', ')}</span>
+              </div>
+            ` : ''}
           </div>
         `).join('')}
 
@@ -298,6 +306,17 @@ const TrainingHistory: React.FC<TrainingHistoryProps> = ({
                       </div>
                     ))}
                   </div>
+
+                  {round.restingPlayerIds.length > 0 && (
+                    <div className="p-5 rounded-2xl border-2 border-dashed border-slate-100 bg-slate-50 flex flex-wrap gap-4 items-center">
+                      <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">In Pausa:</span>
+                      {round.restingPlayerIds.map((id, idx) => (
+                        <span key={idx} className="text-[13px] font-black px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm text-slate-700">
+                          {getPlayerName(id)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
