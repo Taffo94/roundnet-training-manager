@@ -57,6 +57,7 @@ const SessionManager: React.FC<SessionManagerProps> = ({ players, onGenerate }) 
               { id: MatchmakingMode.FULL_RANDOM, label: 'Full Random', desc: 'Senza logica di livello' },
               { id: MatchmakingMode.SAME_LEVEL, label: 'Equilibrato Stesso Livello', desc: 'Forti vs Forti, Deboli vs Deboli' },
               { id: MatchmakingMode.BALANCED_PAIRS, label: 'Equilibrato High-Low', desc: 'Forte+Debole vs Media+Media' },
+              { id: MatchmakingMode.SPLIT_BALANCED, label: 'Split Balanced', desc: 'Balanced Pairs divisi in due fasce di livello' },
             ].map(m => (
               <label key={m.id} className={`flex items-start p-3 rounded-xl border cursor-pointer transition-all ${mode === m.id ? 'border-red-500 bg-red-50' : 'border-slate-200 hover:bg-slate-50'}`}>
                 <input 

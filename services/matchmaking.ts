@@ -102,6 +102,75 @@ export const calculateNewRatings = (
   };
 };
 
+const generateBalancedMatches = (
+  players: Player[], 
+  mode: MatchmakingMode, 
+  previousRounds: Round[]
+): Match[] => {
+  const matches: Match[] = [];
+  const playersToPair = [...players];
+  const getTot = (p: Player) => p.basePoints + p.matchPoints;
+  
+  playersToPair.sort((a, b) => getTot(b) - getTot(a));
+  const half = Math.floor(playersToPair.length / 2);
+  const topHalf = playersToPair.slice(0, half);
+  const bottomHalf = playersToPair.slice(half);
+
+  while (topHalf.length >= 2 && bottomHalf.length >= 2) {
+    const p1Index = Math.floor(Math.random() * topHalf.length);
+    const p1 = topHalf[p1Index];
+    topHalf.splice(p1Index, 1);
+
+    let p2Index = -1;
+    const shuffledBottom = shuffle(bottomHalf.map((p, i) => ({p, i, origIndex: i})));
+    const validPartner = shuffledBottom.find(item => getPartnershipCount(p1.id, item.p.id, previousRounds) === 0);
+    
+    if (validPartner) {
+      p2Index = bottomHalf.findIndex(p => p.id === validPartner.p.id);
+    } else {
+      const fallback = shuffledBottom[0];
+      p2Index = bottomHalf.findIndex(p => p.id === fallback.p.id);
+    }
+
+    const p2 = bottomHalf[p2Index];
+    bottomHalf.splice(p2Index, 1);
+    const teamAScore = getTot(p1) + getTot(p2);
+
+    let bestPair = { tIdx: -1, bIdx: -1, diff: Infinity, playedBefore: true };
+    for (let t = 0; t < topHalf.length; t++) {
+      for (let b = 0; b < bottomHalf.length; b++) {
+         const pStrong = topHalf[t];
+         const pWeak = bottomHalf[b];
+         const score = getTot(pStrong) + getTot(pWeak);
+         const diff = Math.abs(score - teamAScore);
+         const played = getPartnershipCount(pStrong.id, pWeak.id, previousRounds) > 0;
+
+         if (bestPair.tIdx === -1) {
+            bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
+            continue;
+         }
+
+         if (bestPair.playedBefore && !played) {
+            bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
+         } else if (bestPair.playedBefore === played) {
+            if (diff < bestPair.diff) {
+               bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
+            }
+         }
+      }
+    }
+
+    if (bestPair.tIdx !== -1) {
+      const p3 = topHalf[bestPair.tIdx];
+      const p4 = bottomHalf[bestPair.bIdx];
+      topHalf.splice(bestPair.tIdx, 1);
+      bottomHalf.splice(bestPair.bIdx, 1);
+      matches.push(createMatch(p1, p2, p3, p4, mode));
+    }
+  }
+  return matches;
+};
+
 export const generateRound = (
   allParticipants: Player[], mode: MatchmakingMode, roundNumber: number, previousRounds: Round[]
 ): Round => {
@@ -157,63 +226,15 @@ export const generateRound = (
       matches.push(createMatch(p1, p2, p3, p4, mode));
     }
   } else if (mode === MatchmakingMode.BALANCED_PAIRS) {
+    matches.push(...generateBalancedMatches(playersToPair, mode, previousRounds));
+  } else if (mode === MatchmakingMode.SPLIT_BALANCED) {
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
     const half = Math.floor(playersToPair.length / 2);
-    const topHalf = playersToPair.slice(0, half);
-    const bottomHalf = playersToPair.slice(half);
-
-    while (topHalf.length > 0 && bottomHalf.length > 0) {
-      const p1Index = Math.floor(Math.random() * topHalf.length);
-      const p1 = topHalf[p1Index];
-      topHalf.splice(p1Index, 1);
-
-      let p2Index = -1;
-      const shuffledBottom = shuffle(bottomHalf.map((p, i) => ({p, i, origIndex: i})));
-      const validPartner = shuffledBottom.find(item => getPartnershipCount(p1.id, item.p.id, previousRounds) === 0);
-      
-      if (validPartner) {
-        p2Index = bottomHalf.findIndex(p => p.id === validPartner.p.id);
-      } else {
-        const fallback = shuffledBottom[0];
-        p2Index = bottomHalf.findIndex(p => p.id === fallback.p.id);
-      }
-
-      const p2 = bottomHalf[p2Index];
-      bottomHalf.splice(p2Index, 1);
-      const teamAScore = getTot(p1) + getTot(p2);
-
-      let bestPair = { tIdx: -1, bIdx: -1, diff: Infinity, playedBefore: true };
-      for (let t = 0; t < topHalf.length; t++) {
-        for (let b = 0; b < bottomHalf.length; b++) {
-           const pStrong = topHalf[t];
-           const pWeak = bottomHalf[b];
-           const score = getTot(pStrong) + getTot(pWeak);
-           const diff = Math.abs(score - teamAScore);
-           const played = getPartnershipCount(pStrong.id, pWeak.id, previousRounds) > 0;
-
-           if (bestPair.tIdx === -1) {
-              bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
-              continue;
-           }
-
-           if (bestPair.playedBefore && !played) {
-              bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
-           } else if (bestPair.playedBefore === played) {
-              if (diff < bestPair.diff) {
-                 bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
-              }
-           }
-        }
-      }
-
-      if (bestPair.tIdx !== -1) {
-        const p3 = topHalf[bestPair.tIdx];
-        const p4 = bottomHalf[bestPair.bIdx];
-        topHalf.splice(bestPair.tIdx, 1);
-        bottomHalf.splice(bestPair.bIdx, 1);
-        matches.push(createMatch(p1, p2, p3, p4, mode));
-      }
-    }
+    const topGroup = playersToPair.slice(0, half);
+    const bottomGroup = playersToPair.slice(half);
+    
+    matches.push(...generateBalancedMatches(topGroup, mode, previousRounds));
+    matches.push(...generateBalancedMatches(bottomGroup, mode, previousRounds));
   } else {
     const shuffled = shuffle(playersToPair);
     for (let i = 0; i < numMatches; i++) {
