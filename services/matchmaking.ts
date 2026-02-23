@@ -179,12 +179,36 @@ export const generateRound = (
   const numResting = participantCount % 4;
 
   const restCounts: Record<string, number> = {};
-  allParticipants.forEach(p => restCounts[p.id] = 0);
-  previousRounds.forEach(r => r.restingPlayerIds.forEach(id => { if(restCounts[id] !== undefined) restCounts[id]++; }));
+  const lastRestRound: Record<string, number> = {};
+  allParticipants.forEach(p => {
+    restCounts[p.id] = 0;
+    lastRestRound[p.id] = -1;
+  });
+
+  previousRounds.forEach((r, idx) => {
+    r.restingPlayerIds.forEach(id => {
+      if (restCounts[id] !== undefined) restCounts[id]++;
+      if (lastRestRound[id] !== undefined) lastRestRound[id] = idx;
+    });
+  });
+
+  // Calculate a score for resting: lower score means higher priority to rest
+  // We prioritize players who have rested fewer times total, 
+  // and among those, those who haven't rested for the longest time.
+  const getRestPriorityScore = (id: string) => {
+    const count = restCounts[id];
+    const last = lastRestRound[id];
+    const roundsSinceLastRest = last === -1 ? 999 : (roundNumber - 1 - last);
+    // Penalty for resting twice in a row is very high
+    const consecutiveRestPenalty = roundsSinceLastRest === 0 ? 10000 : 0;
+    return (count * 1000) - roundsSinceLastRest + consecutiveRestPenalty;
+  };
 
   const pool = shuffle([...allParticipants]);
-  const sortedByRest = [...pool].sort((a, b) => restCounts[a.id] - restCounts[b.id]);
-  const restingIds = numResting > 0 ? sortedByRest.slice(0, numResting).map(p => p.id) : [];
+  // Sort by rest priority score (ascending: lowest score rests first)
+  const sortedByRestPriority = [...pool].sort((a, b) => getRestPriorityScore(a.id) - getRestPriorityScore(b.id));
+  
+  const restingIds = numResting > 0 ? sortedByRestPriority.slice(0, numResting).map(p => p.id) : [];
   const activePlayers = pool.filter(p => !restingIds.includes(p.id));
 
   const matches: Match[] = [];
@@ -229,12 +253,14 @@ export const generateRound = (
     matches.push(...generateBalancedMatches(playersToPair, mode, previousRounds));
   } else if (mode === MatchmakingMode.SPLIT_BALANCED) {
     playersToPair.sort((a, b) => getTot(b) - getTot(a));
-    const half = Math.floor(playersToPair.length / 2);
-    const topGroup = playersToPair.slice(0, half);
-    const bottomGroup = playersToPair.slice(half);
+    // To maximize matches, the split point should be a multiple of 4
+    const idealMid = playersToPair.length / 2;
+    const mid = Math.round(idealMid / 4) * 4;
+    const topGroup = playersToPair.slice(0, mid);
+    const bottomGroup = playersToPair.slice(mid);
     
-    matches.push(...generateBalancedMatches(topGroup, mode, previousRounds));
-    matches.push(...generateBalancedMatches(bottomGroup, mode, previousRounds));
+    if (topGroup.length > 0) matches.push(...generateBalancedMatches(topGroup, mode, previousRounds));
+    if (bottomGroup.length > 0) matches.push(...generateBalancedMatches(bottomGroup, mode, previousRounds));
   } else {
     const shuffled = shuffle(playersToPair);
     for (let i = 0; i < numMatches; i++) {
