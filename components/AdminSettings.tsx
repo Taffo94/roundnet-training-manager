@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { AppSettings, Player, RankingSettings, RankingModeParams, AppSnapshot, TrainingSession } from '../types';
+import { AppSettings, Player, RankingSettings, RankingModeParams, AppSnapshot, TrainingSession, MatchmakingMode } from '../types';
 import { createSnapshot, getSnapshots, getSnapshotContent } from '../services/storage';
 import { calculateNewRatings } from '../services/matchmaking';
 
@@ -13,10 +13,10 @@ interface AdminSettingsProps {
   onRecalculateGlobal?: () => void;
 }
 
-type SettingsSection = 'ranking' | 'backup';
+type SettingsSection = 'ranking' | 'backup' | 'general';
 
 const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSettings, players, sessions, onRestoreSnapshot, onRecalculateGlobal }) => {
-  const [activeSection, setActiveSection] = useState<SettingsSection>('ranking');
+  const [activeSection, setActiveSection] = useState<SettingsSection | 'general'>('ranking');
   const [snapshots, setSnapshots] = useState<Partial<AppSnapshot>[]>([]);
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [backupReason, setBackupReason] = useState('Aggiornamento parametri');
@@ -170,6 +170,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
             onChange={(e) => setActiveSection(e.target.value as SettingsSection)}
           >
             <option value="ranking">Algoritmo & Ranking</option>
+            <option value="general">Modalità Matchmaking</option>
             <option value="backup">Backup & Restore</option>
           </select>
         </div>
@@ -182,6 +183,13 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
            >
              <span>Algoritmo & Ranking</span>
              <span className={`opacity-0 group-hover:opacity-100 transition-opacity ${activeSection === 'ranking' ? 'text-white' : 'text-slate-400'}`}>→</span>
+           </button>
+           <button 
+             onClick={() => setActiveSection('general')}
+             className={`text-left px-5 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center justify-between group ${activeSection === 'general' ? 'bg-red-600 text-white shadow-lg shadow-red-200' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+           >
+             <span>Modalità Matchmaking</span>
+             <span className={`opacity-0 group-hover:opacity-100 transition-opacity ${activeSection === 'general' ? 'text-white' : 'text-slate-400'}`}>→</span>
            </button>
            <button 
              onClick={() => setActiveSection('backup')}
@@ -205,6 +213,59 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
       {/* 2. MAIN CONTENT AREA */}
       <div className="flex-1 w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
          
+         {/* SECTION: GENERAL SETTINGS / MODES */}
+         {activeSection === 'general' && (
+           <section className="bg-white rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden">
+             <div className="p-8 bg-slate-100 border-b border-slate-200">
+               <h3 className="font-black text-lg uppercase italic tracking-widest text-slate-800">Modalità Matchmaking</h3>
+               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Attiva o disattiva le modalità di generazione partite</p>
+             </div>
+             <div className="p-8 space-y-4">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 {Object.values(MatchmakingMode).filter(m => m !== MatchmakingMode.CUSTOM).map(mode => (
+                   <label key={mode} className="flex items-center p-4 bg-slate-50 rounded-2xl border border-slate-200 cursor-pointer hover:bg-white transition-all">
+                     <input 
+                       type="checkbox" 
+                       className="w-5 h-5 rounded border-slate-300 text-red-600 focus:ring-red-500 mr-4"
+                       checked={settings.activeMatchmakingModes.includes(mode)}
+                       onChange={(e) => {
+                         const newModes = e.target.checked 
+                           ? [...settings.activeMatchmakingModes, mode]
+                           : settings.activeMatchmakingModes.filter(m => m !== mode);
+                         onUpdateSettings({ ...settings, activeMatchmakingModes: newModes });
+                       }}
+                     />
+                     <div>
+                       <div className="font-black text-xs uppercase italic text-slate-800">{mode.replace('_', ' ')}</div>
+                       <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                         {mode === MatchmakingMode.FULL_RANDOM && 'Nessuna logica di livello'}
+                         {mode === MatchmakingMode.SAME_LEVEL && 'Forti vs Forti, Deboli vs Deboli'}
+                         {mode === MatchmakingMode.BALANCED_PAIRS && 'Forte+Debole vs Media+Media'}
+                         {mode === MatchmakingMode.SPLIT_BALANCED && 'Balanced Pairs su due fasce di livello'}
+                         {mode === MatchmakingMode.GENDER_BALANCED && 'Bilanciamento per genere'}
+                       </div>
+                     </div>
+                   </label>
+                 ))}
+               </div>
+               <div className="pt-6 border-t border-slate-100">
+                 <label className="flex items-center p-4 bg-slate-50 rounded-2xl border border-slate-200 cursor-pointer hover:bg-white transition-all">
+                    <input 
+                      type="checkbox" 
+                      className="w-5 h-5 rounded border-slate-300 text-slate-900 focus:ring-slate-500 mr-4"
+                      checked={settings.allowManualSessionCreation}
+                      onChange={(e) => onUpdateSettings({ ...settings, allowManualSessionCreation: e.target.checked })}
+                    />
+                    <div>
+                      <div className="font-black text-xs uppercase italic text-slate-800">Creazione Manuale</div>
+                      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Permetti di aggiungere round personalizzati</div>
+                    </div>
+                 </label>
+               </div>
+             </div>
+           </section>
+         )}
+
          {/* SECTION: RANKING & ALGORITHM */}
          {activeSection === 'ranking' && (
            <>

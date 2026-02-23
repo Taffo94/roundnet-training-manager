@@ -40,12 +40,22 @@ export const loadSettings = async (): Promise<AppSettings> => {
   const { data, error } = await supabase.from('app_settings').select('settings, updated_at').eq('id', 'main').single();
   if (error || !data) return defaultSettings;
   
-  const saved = data.settings;
+  const saved = data.settings || {};
   const lastUpdated = data.updated_at ? new Date(data.updated_at).getTime() : undefined;
+
+  // Merge matchmaking modes to ensure new ones appear
+  const allAvailableModes = Object.values(MatchmakingMode).filter(m => m !== MatchmakingMode.CUSTOM);
+  let activeModes = saved.activeMatchmakingModes || allAvailableModes;
+  
+  // If SPLIT_BALANCED is missing (new feature), add it
+  if (activeModes && !activeModes.includes(MatchmakingMode.SPLIT_BALANCED)) {
+    activeModes = [...activeModes, MatchmakingMode.SPLIT_BALANCED];
+  }
 
   return {
     ...defaultSettings,
     ...saved,
+    activeMatchmakingModes: activeModes,
     lastUpdated: saved.lastUpdated || lastUpdated,
     ranking: {
       ...defaultSettings.ranking,

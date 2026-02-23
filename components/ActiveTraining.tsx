@@ -160,6 +160,18 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
   // Filtriamo i bottoni matchmaking in base alle impostazioni
   const activeModes = settings?.activeMatchmakingModes || Object.values(MatchmakingMode);
 
+  const getModeLabel = (m: MatchmakingMode) => {
+    switch(m) {
+      case MatchmakingMode.FULL_RANDOM: return 'Full Random';
+      case MatchmakingMode.SAME_LEVEL: return 'Stesso Livello';
+      case MatchmakingMode.BALANCED_PAIRS: return 'Balanced Pairs';
+      case MatchmakingMode.SPLIT_BALANCED: return 'Split Balanced';
+      case MatchmakingMode.GENDER_BALANCED: return 'Gender Balanced';
+      case MatchmakingMode.CUSTOM: return 'Manuale';
+      default: return (m as string).replace('_', ' ');
+    }
+  };
+
   return (
     <div className="space-y-10 max-w-5xl mx-auto">
       <div className="flex justify-between items-end border-b-2 border-slate-100 pb-6">
@@ -206,7 +218,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
               <div className="bg-slate-800 text-white px-8 py-4 flex justify-between items-center">
                 <div className="flex items-center gap-4">
                   <span className="font-black italic uppercase tracking-widest text-sm">Round {round.roundNumber}</span>
-                  <span className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-black uppercase">{round.mode.replace('_', ' ')}</span>
+                  <span className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-black uppercase">{getModeLabel(round.mode)}</span>
                   {isRoundLocked && (
                     <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-green-500/30">In corso / Bloccato</span>
                   )}
@@ -352,7 +364,7 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
         })}
         <div className="bg-white rounded-3xl p-10 border-4 border-dotted border-slate-200 flex flex-wrap justify-center gap-4">
           {activeModes.map(m => (
-            <button key={m} onClick={() => onAddRound(session.id, m)} className="bg-slate-50 border border-slate-200 px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] hover:text-red-600 hover:border-red-500 transition-all hover:bg-red-50/50 shadow-sm">{m.replace('_', ' ')}</button>
+            <button key={m} onClick={() => onAddRound(session.id, m)} className="bg-slate-50 border border-slate-200 px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] hover:text-red-600 hover:border-red-500 transition-all hover:bg-red-50/50 shadow-sm">{getModeLabel(m)}</button>
           ))}
           {settings?.allowManualSessionCreation && (
             <button onClick={() => onAddRound(session.id, MatchmakingMode.CUSTOM)} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] hover:bg-black transition-all shadow-xl">Aggiungi Manuale</button>
