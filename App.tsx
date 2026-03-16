@@ -8,6 +8,7 @@ import ActiveTraining from './components/ActiveTraining';
 import TrainingHistory from './components/TrainingHistory';
 import PlayerStats from './components/PlayerStats';
 import AdminSettings from './components/AdminSettings';
+import RankingSimulator from './components/RankingSimulator';
 
 const AUTH_STORAGE_KEY = 'rmi_auth_session';
 
@@ -105,7 +106,7 @@ const App: React.FC = () => {
 
   const recalculateAllPoints = async () => {
     if (!state) return;
-    
+
     setIsSyncing(true);
     let updatedPlayers = state.players.map(p => ({ ...p, matchPoints: 0, wins: 0, losses: 0 }));
     const sortedSessions = [...state.sessions]
@@ -136,9 +137,9 @@ const App: React.FC = () => {
 
   const activeSession = state?.sessions.find(s => s.status === 'ACTIVE');
   const isAdmin = auth === 'admin';
-  
-  const tabs = isAdmin 
-    ? ['ranking', 'training', 'history', 'stats', 'settings'] 
+
+  const tabs = isAdmin
+    ? ['ranking', 'training', 'history', 'stats', 'settings']
     : (state?.settings.showStatsToAthletes ? ['ranking', 'history', 'stats'] : ['ranking', 'history']);
 
   const rankingDeltas = useMemo(() => {
@@ -148,7 +149,7 @@ const App: React.FC = () => {
     const lastSession = archivedSessions[0];
     const deltas: Record<string, { points: number, rankChange: number }> = {};
     const visiblePlayers = state.players.filter(p => !p.isHidden);
-    
+
     const sortFn = (playersArr: any[]) => [...playersArr].sort((a, b) => {
       const scoreA = a.basePoints + (a.matchPoints || 0);
       const scoreB = b.basePoints + (b.matchPoints || 0);
@@ -167,13 +168,13 @@ const App: React.FC = () => {
       return { ...p, matchPoints: p.matchPoints - sessionPoints, sessionDelta: sessionPoints };
     });
     const prevRanking = sortFn(prevPlayers);
-    
+
     visiblePlayers.forEach(p => {
       const currentRank = currentRanking.findIndex(x => x.id === p.id) + 1;
       const prevRank = prevRanking.findIndex(x => x.id === p.id) + 1;
-      deltas[p.id] = { 
-        points: prevPlayers.find(x => x.id === p.id)?.sessionDelta || 0, 
-        rankChange: currentRank === 0 || prevRank === 0 ? 0 : prevRank - currentRank 
+      deltas[p.id] = {
+        points: prevPlayers.find(x => x.id === p.id)?.sessionDelta || 0,
+        rankChange: currentRank === 0 || prevRank === 0 ? 0 : prevRank - currentRank
       };
     });
     return deltas;
@@ -191,23 +192,23 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center space-y-8 animate-in fade-in zoom-in duration-500">
-           <div className="flex justify-center"><Logo /></div>
-           <h1 className="text-3xl font-black uppercase italic tracking-tighter text-slate-800">Roundnet Milano <span className="text-red-600">Training</span></h1>
-           {!showAdminLogin ? (
-             <div className="space-y-4">
-               <button onClick={() => setAuth('user')} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 py-4 rounded-2xl font-black uppercase tracking-widest transition-all">Accesso Atleta</button>
-               <button onClick={() => setShowAdminLogin(true)} className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-red-200">Area Admin</button>
-             </div>
-           ) : (
-             <form onSubmit={handleAdminLogin} className="space-y-4">
-               <input type="password" placeholder="Password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-center outline-none focus:border-red-500 transition-all" autoFocus />
-               <div className="flex gap-3">
-                 <button type="button" onClick={() => setShowAdminLogin(false)} className="flex-1 bg-slate-100 text-slate-600 py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Indietro</button>
-                 <button type="submit" className="flex-[2] bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Entra</button>
-               </div>
-               {loginError && <p className="text-red-600 text-[10px] font-black uppercase">{loginError}</p>}
-             </form>
-           )}
+          <div className="flex justify-center"><Logo /></div>
+          <h1 className="text-3xl font-black uppercase italic tracking-tighter text-slate-800">Roundnet Milano <span className="text-red-600">Training</span></h1>
+          {!showAdminLogin ? (
+            <div className="space-y-4">
+              <button onClick={() => setAuth('user')} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 py-4 rounded-2xl font-black uppercase tracking-widest transition-all">Accesso Atleta</button>
+              <button onClick={() => setShowAdminLogin(true)} className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-red-200">Area Admin</button>
+            </div>
+          ) : (
+            <form onSubmit={handleAdminLogin} className="space-y-4">
+              <input type="password" placeholder="Password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-center outline-none focus:border-red-500 transition-all" autoFocus />
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setShowAdminLogin(false)} className="flex-1 bg-slate-100 text-slate-600 py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Indietro</button>
+                <button type="submit" className="flex-[2] bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Entra</button>
+              </div>
+              {loginError && <p className="text-red-600 text-[10px] font-black uppercase">{loginError}</p>}
+            </form>
+          )}
         </div>
       </div>
     );
@@ -238,52 +239,61 @@ const App: React.FC = () => {
 
       <main className="flex-1 container mx-auto px-4 py-8">
         {state.currentTab === 'ranking' && (
-          <PlayerList 
-            players={state.players} deltas={rankingDeltas} isAdmin={isAdmin}
-            onAddPlayer={(n, ni, g, b) => setState(p => p ? ({ ...p, players: [...p.players, { id: Math.random().toString(36).substr(2, 9), name: n, nickname: ni, gender: g, wins: 0, losses: 0, basePoints: b, matchPoints: 0, lastActive: Date.now() }] }) : null)} 
-            onUpdatePlayer={(id, n, ni, g, b, m) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, name: n, nickname: ni, gender: g, basePoints: b, matchPoints: m } : x) }) : null)} 
-            onDeletePlayer={(id) => { if(window.confirm("Eliminare definitivamente l'atleta?")) { deletePlayerFromDB(id); setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null); } }} 
-            onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
-            onResetPoints={() => {}} onRecalculate={recalculateAllPoints}
-            onToggleHidden={(id) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, isHidden: !x.isHidden } : x) }) : null)}
-          />
+          <>
+            <PlayerList
+              players={state.players} deltas={rankingDeltas} isAdmin={isAdmin}
+              onAddPlayer={(n, ni, g, b) => setState(p => p ? ({ ...p, players: [...p.players, { id: Math.random().toString(36).substr(2, 9), name: n, nickname: ni, gender: g, wins: 0, losses: 0, basePoints: b, matchPoints: 0, lastActive: Date.now() }] }) : null)}
+              onUpdatePlayer={(id, n, ni, g, b, m) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, name: n, nickname: ni, gender: g, basePoints: b, matchPoints: m } : x) }) : null)}
+              onDeletePlayer={(id) => { if (window.confirm("Eliminare definitivamente l'atleta?")) { deletePlayerFromDB(id); setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null); } }}
+              onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)}
+              onResetPoints={() => { }} onRecalculate={recalculateAllPoints}
+              onToggleHidden={(id) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, isHidden: !x.isHidden } : x) }) : null)}
+            />
+            {isAdmin && (
+              <RankingSimulator
+                players={state.players}
+                sessions={state.sessions}
+                productionSettings={state.settings.ranking}
+              />
+            )}
+          </>
         )}
         {isAdmin && state.currentTab === 'training' && (
-          <ActiveTraining 
-            attendanceMap={attendanceMap} session={activeSession} players={state.players} 
-            onStartSession={(ids, date) => setState(p => p ? ({ ...p, sessions: [{ id: Math.random().toString(36).substr(2, 9), date, participantIds: ids, rounds: [], status: 'ACTIVE' }, ...p.sessions], currentTab: 'training' }) : null)} 
-            onAddRound={(sid, mode) => setState(prev => { if (!prev) return null; const s = prev.sessions.find(x => x.id === sid); if (!s) return prev; return { ...prev, sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: [...x.rounds, generateRound(prev.players.filter(p => s.participantIds.includes(p.id)), mode, x.rounds.length + 1, x.rounds)] } : x) }; })} 
+          <ActiveTraining
+            attendanceMap={attendanceMap} session={activeSession} players={state.players}
+            onStartSession={(ids, date) => setState(p => p ? ({ ...p, sessions: [{ id: Math.random().toString(36).substr(2, 9), date, participantIds: ids, rounds: [], status: 'ACTIVE' }, ...p.sessions], currentTab: 'training' }) : null)}
+            onAddRound={(sid, mode) => setState(prev => { if (!prev) return null; const s = prev.sessions.find(x => x.id === sid); if (!s) return prev; return { ...prev, sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: [...x.rounds, generateRound(prev.players.filter(p => s.participantIds.includes(p.id)), mode, x.rounds.length + 1, x.rounds)] } : x) }; })}
             onDeleteRound={(sid, rid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.filter(r => r.id !== rid) } : s) }) : null)}
             onRefreshRound={(sid, rid) => setState(prev => { if (!prev) return null; const s = prev.sessions.find(x => x.id === sid); const r = s?.rounds.find(x => x.id === rid); if (!s || !r) return prev; const newRound = generateRound(prev.players.filter(p => s.participantIds.includes(p.id)), r.mode, r.roundNumber, s.rounds.slice(0, s.rounds.indexOf(r))); return { ...prev, sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: x.rounds.map(y => y.id === rid ? newRound : y) } : x) }; })}
-            onUpdateScore={updateMatchScore} 
+            onUpdateScore={updateMatchScore}
             onReopenMatch={(sid, rid, mid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, matches: r.matches.map(m => m.id === mid ? { ...m, status: 'PENDING' } : m) } : r) } : s) }) : null)}
             onUpdatePlayers={(sid, rid, mid, team, idx, pid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, matches: r.matches.map(m => m.id === mid ? { ...m, [team === 1 ? 'team1' : 'team2']: { ...m[team === 1 ? 'team1' : 'team2'], playerIds: m[team === 1 ? 'team1' : 'team2'].playerIds.map((p, i) => i === idx ? pid : p) } } : m) } : r) } : s) }) : null)}
             onUpdateResting={(sid, rid, idx, pid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, restingPlayerIds: r.restingPlayerIds.map((p, i) => i === idx ? pid : p) } : r) } : s) }) : null)}
             onUpdateSessionDate={(sid, date) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, date } : s) }) : null)}
             onEditParticipants={(ids) => activeSession && setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === activeSession.id ? { ...s, participantIds: ids } : s) }) : null)}
-            onArchive={(id) => setState(p => p ? ({ ...p, sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' } : x), currentTab: 'history' }) : null)} 
-            onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
+            onArchive={(id) => setState(p => p ? ({ ...p, sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' } : x), currentTab: 'history' }) : null)}
+            onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)}
             settings={state.settings}
           />
         )}
         {state.currentTab === 'history' && (
-          <TrainingHistory 
+          <TrainingHistory
             sessions={state.sessions.filter(s => s.status === 'ARCHIVED')} players={state.players} isAdmin={isAdmin}
             onUpdateSessionDate={(sid, date) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, date } : s) }) : null)}
-            onDeleteRound={(sid, rid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.filter(r => r.id !== rid) } : s) }) : null)} 
-            onDeleteSession={(sid) => { if(window.confirm("Eliminare definitivamente l'intera sessione archiviata?")) { deleteSessionFromDB(sid); setState(prev => prev ? ({ ...prev, sessions: prev.sessions.filter(s => s.id !== sid) }) : null); } }}
-            onUpdateScore={updateMatchScore} 
+            onDeleteRound={(sid, rid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.filter(r => r.id !== rid) } : s) }) : null)}
+            onDeleteSession={(sid) => { if (window.confirm("Eliminare definitivamente l'intera sessione archiviata?")) { deleteSessionFromDB(sid); setState(prev => prev ? ({ ...prev, sessions: prev.sessions.filter(s => s.id !== sid) }) : null); } }}
+            onUpdateScore={updateMatchScore}
             onReopenMatch={(sid, rid, mid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, matches: r.matches.map(m => m.id === mid ? { ...m, status: 'PENDING' } : m) } : r) } : s) }) : null)}
             onUpdatePlayers={(sid, rid, mid, team, idx, pid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, matches: r.matches.map(m => m.id === mid ? { ...m, [team === 1 ? 'team1' : 'team2']: { ...m[team === 1 ? 'team1' : 'team2'], playerIds: m[team === 1 ? 'team1' : 'team2'].playerIds.map((p, i) => i === idx ? pid : p) } } : m) } : r) } : s) }) : null)}
             onUpdateResting={(sid, rid, idx, pid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, restingPlayerIds: r.restingPlayerIds.map((p, i) => i === idx ? pid : p) } : r) } : s) }) : null)}
-            onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)} 
+            onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)}
           />
         )}
         {state.currentTab === 'stats' && (
           <PlayerStats players={state.players} sessions={state.sessions} selectedPlayerId={state.selectedPlayerId} onSelectPlayer={(id) => setState(p => p ? ({ ...p, selectedPlayerId: id }) : null)} />
         )}
         {isAdmin && state.currentTab === 'settings' && (
-          <AdminSettings 
+          <AdminSettings
             settings={state.settings}
             onUpdateSettings={(newSets) => setState(p => p ? ({ ...p, settings: newSets }) : null)}
             players={state.players}
