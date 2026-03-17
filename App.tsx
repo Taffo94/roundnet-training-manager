@@ -273,6 +273,7 @@ const App: React.FC = () => {
             onEditParticipants={(ids) => activeSession && setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === activeSession.id ? { ...s, participantIds: ids } : s) }) : null)}
             onArchive={(id) => setState(p => p ? ({ ...p, sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' } : x), currentTab: 'history' }) : null)}
             onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)}
+            onDeleteSession={(id) => { if(window.confirm("Annullare l'allenamento e tornare alla selezione?")) { deleteSessionFromDB(id); setState(p => p ? ({ ...p, sessions: p.sessions.filter(x => x.id !== id) }) : null); } }}
             settings={state.settings}
           />
         )}

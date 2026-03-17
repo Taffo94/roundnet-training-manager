@@ -188,10 +188,7 @@ const PlayerList: React.FC<PlayerListProps> = ({
                       {isEditing ? (
                         <input type="number" value={editFormData?.matchPoints} onChange={e => setEditFormData(prev => prev ? {...prev, matchPoints: parseInt(e.target.value) || 0} : null)} className="p-1 border border-slate-200 rounded-lg font-bold text-xs w-20 text-center outline-none focus:border-red-500" />
                       ) : (
-                        <div className="flex flex-col items-center">
-                          <span className="font-bold text-slate-600">{Math.round(player.matchPoints)}</span>
-                          {d && d.points !== 0 && <span className={`text-[9px] font-black italic ${d.points > 0 ? 'text-green-500' : 'text-red-500'}`}>{d.points > 0 ? '+' : ''}{d.points.toFixed(1)}</span>}
-                        </div>
+                        <span className="font-bold text-slate-600">{Math.round(player.matchPoints)}</span>
                       )}
                     </td>
                   )}
@@ -199,7 +196,14 @@ const PlayerList: React.FC<PlayerListProps> = ({
                     {isEditing ? (
                       <input type="number" value={editFormData?.basePoints} onChange={e => setEditFormData(prev => prev ? {...prev, basePoints: parseInt(e.target.value) || 0} : null)} className="p-1 border border-slate-200 rounded-lg font-bold text-xs w-20 text-center outline-none focus:border-red-500" />
                     ) : (
-                      <span className="bg-red-50 text-red-700 px-4 py-1.5 rounded-full text-sm font-black italic shadow-sm">{Math.round(player.basePoints + player.matchPoints)}</span>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="bg-red-50 text-red-700 px-4 py-1.5 rounded-full text-sm font-black italic shadow-sm">{Math.round(player.basePoints + player.matchPoints)}</span>
+                        {d && d.points !== 0 && (
+                          <span className={`text-[10px] font-black italic ${d.points > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {d.points > 0 ? '▲' : '▼'} {Math.abs(d.points).toFixed(1)}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td className="px-6 py-5 text-center text-xs font-black text-slate-400">

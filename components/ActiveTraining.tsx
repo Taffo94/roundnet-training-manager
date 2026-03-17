@@ -17,6 +17,7 @@ interface ActiveTrainingProps {
   onUpdateSessionDate: (sid: string, newDate: number) => void;
   onArchive: (sessionId: string) => void;
   onSelectPlayer: (id: string) => void;
+  onDeleteSession: (id: string) => void;
   onEditParticipants?: (ids: string[]) => void;
   settings?: AppSettings;
 }
@@ -31,7 +32,7 @@ const getNextMonday = () => {
 };
 
 const ActiveTraining: React.FC<ActiveTrainingProps> = ({ 
-  session, players, attendanceMap, onStartSession, onAddRound, onDeleteRound, onRefreshRound, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onUpdateSessionDate, onArchive, onSelectPlayer, onEditParticipants, settings
+  session, players, attendanceMap, onStartSession, onAddRound, onDeleteRound, onRefreshRound, onUpdateScore, onReopenMatch, onUpdatePlayers, onUpdateResting, onUpdateSessionDate, onArchive, onSelectPlayer, onDeleteSession, onEditParticipants, settings
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>(session?.participantIds || []);
   const [matchScores, setMatchScores] = useState<Record<string, { s1: string, s2: string }>>({});
@@ -206,7 +207,10 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
             </button>
           </div>
         </div>
-        <button onClick={() => onArchive(session.id)} className="bg-slate-900 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase shadow-lg hover:bg-black transition-all">Archivia Sessione</button>
+        <div className="flex gap-4">
+          <button onClick={() => onDeleteSession(session.id)} className="bg-white border-2 border-slate-200 text-slate-500 px-8 py-3 rounded-2xl text-xs font-black uppercase hover:border-red-500 hover:text-red-500 transition-all">Annulla Sessione</button>
+          <button onClick={() => onArchive(session.id)} className="bg-slate-900 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase shadow-lg hover:bg-black transition-all">Archivia Sessione</button>
+        </div>
       </div>
       <div className="space-y-12">
         {session.rounds.map((round) => {
@@ -276,22 +280,32 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
                                 return (
                                   <div key={idx}>
                                     {m.status === 'PENDING' ? (
-                                      <select 
-                                        value={id} 
-                                        onChange={(e) => onUpdatePlayers(session.id, round.id, m.id, t as 1|2, idx as 0|1, e.target.value)} 
-                                        className={`text-[12px] font-bold p-2 bg-white border rounded-xl outline-none w-full shadow-sm ${conflicts.has(id) ? 'border-red-500 text-red-600 bg-red-50' : 'border-slate-200 focus:border-red-600'}`}
-                                      >
-                                        <option value="">Scegli...</option>
-                                        {participants.map(p => <option key={p.id} value={p.id}>{p.nickname || p.name}</option>)}
-                                      </select>
-                                    ) : (
-                                      <div className={`flex items-center gap-2 w-full ${t === 2 ? 'justify-end' : ''}`}>
-                                        <button 
-                                          onClick={() => onSelectPlayer(id)} 
-                                          className={`text-[15px] font-black hover:text-red-600 truncate ${t === 2 ? 'text-right order-2' : 'text-left'} ${conflicts.has(id) ? 'text-red-600 underline decoration-red-500 decoration-2 underline-offset-4' : 'text-slate-800'}`}
+                                      <div className="space-y-1">
+                                        <select 
+                                          value={id} 
+                                          onChange={(e) => onUpdatePlayers(session.id, round.id, m.id, t as 1|2, idx as 0|1, e.target.value)} 
+                                          className={`text-[12px] font-bold p-2 bg-white border rounded-xl outline-none w-full shadow-sm ${conflicts.has(id) ? 'border-red-500 text-red-600 bg-red-50' : 'border-slate-200 focus:border-red-600'}`}
                                         >
-                                          {displayName}
-                                        </button>
+                                          <option value="">Scegli...</option>
+                                          {participants.map(p => <option key={p.id} value={p.id}>{p.nickname || p.name}</option>)}
+                                        </select>
+                                        {player && (
+                                          <div className={`text-[9px] font-black text-slate-400 uppercase tracking-tighter ${t === 2 ? 'text-right' : 'text-left'}`}>
+                                            ELO: <span className="text-slate-600">{Math.round(player.basePoints + player.matchPoints)}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                          <div className={`flex items-center gap-2 w-full ${t === 2 ? 'justify-end' : ''}`}>
+                                            <button 
+                                              onClick={() => onSelectPlayer(id)} 
+                                              className={`text-[15px] font-black hover:text-red-600 truncate flex items-center gap-2 ${t === 2 ? 'flex-row-reverse text-right' : 'text-left'} ${conflicts.has(id) ? 'text-red-600 underline decoration-red-500 decoration-2 underline-offset-4' : 'text-slate-800'}`}
+                                            >
+                                              <span>{displayName}</span>
+                                              <span className="text-[10px] font-black text-slate-400 bg-slate-100/50 px-1.5 py-0.5 rounded border border-slate-100">
+                                                {player ? Math.round(player.basePoints + player.matchPoints) : 0}
+                                              </span>
+                                            </button>
                                         {delta !== undefined && (
                                           <span className={`text-[9px] font-black italic px-1.5 py-0.5 rounded ${delta >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
                                             {delta >= 0 ? '+' : ''}{delta.toFixed(1)}

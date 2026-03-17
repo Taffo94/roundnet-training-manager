@@ -72,13 +72,29 @@ export const calculateNewRatings = (
   const eloP3 = p3.basePoints + p3.matchPoints;
   const eloP4 = p4.basePoints + p4.matchPoints;
 
-  const avgOppS1 = (eloP3 + eloP4) / 2;
-  const avgOppS2 = (eloP1 + eloP2) / 2;
+  const avgTeam1 = (eloP1 + eloP2) / 2;
+  const avgTeam2 = (eloP3 + eloP4) / 2;
 
-  const deltaP1 = kEff * (resultS1 - getExpectedScore(eloP1, avgOppS1));
-  const deltaP2 = kEff * (resultS1 - getExpectedScore(eloP2, avgOppS1));
-  const deltaP3 = kEff * (resultS2 - getExpectedScore(eloP3, avgOppS2));
-  const deltaP4 = kEff * (resultS2 - getExpectedScore(eloP4, avgOppS2));
+  // 1. Calcoliamo lo scambio base del match (Team vs Team)
+  const expectedTeam1 = getExpectedScore(avgTeam1, avgTeam2);
+  const matchDelta = kEff * (resultS1 - expectedTeam1);
+
+  // 2. Calcoliamo i delta individuali teorici (per pesare il livello del singolo)
+  const targetDeltaP1 = kEff * (resultS1 - getExpectedScore(eloP1, avgTeam2));
+  const targetDeltaP2 = kEff * (resultS1 - getExpectedScore(eloP2, avgTeam2));
+  const targetDeltaP3 = kEff * (resultS2 - getExpectedScore(eloP3, avgTeam1));
+  const targetDeltaP4 = kEff * (resultS2 - getExpectedScore(eloP4, avgTeam1));
+
+  // 3. Bilanciamo affinché la media dei delta del team corrisponda allo scambio del match
+  // Questo garantisce che Sum(TeamA) = -Sum(TeamB)
+  const team1AvgTarget = (targetDeltaP1 + targetDeltaP2) / 2;
+  const team2AvgTarget = (targetDeltaP3 + targetDeltaP4) / 2;
+  
+  // Normalizzazione per assicurare la somma zero perfetta
+  const deltaP1 = targetDeltaP1 * (matchDelta / (team1AvgTarget || 1));
+  const deltaP2 = targetDeltaP2 * (matchDelta / (team1AvgTarget || 1));
+  const deltaP3 = targetDeltaP3 * (-matchDelta / (team2AvgTarget || 1));
+  const deltaP4 = targetDeltaP4 * (-matchDelta / (team2AvgTarget || 1));
 
   const individualDeltas: Record<string, number> = {
     [p1.id]: deltaP1, [p2.id]: deltaP2, [p3.id]: deltaP3, [p4.id]: deltaP4
@@ -136,26 +152,25 @@ const generateBalancedMatches = (
     bottomHalf.splice(p2Index, 1);
     const teamAScore = getTot(p1) + getTot(p2);
 
-    let bestPair = { tIdx: -1, bIdx: -1, diff: Infinity, playedBefore: true };
+    let bestPair = { tIdx: -1, bIdx: -1, score: Infinity };
+    
+    // Evaluate all remaining possible pairs to find the best match for Team A
     for (let t = 0; t < topHalf.length; t++) {
       for (let b = 0; b < bottomHalf.length; b++) {
-         const pStrong = topHalf[t];
-         const pWeak = bottomHalf[b];
-         const score = getTot(pStrong) + getTot(pWeak);
-         const diff = Math.abs(score - teamAScore);
-         const played = getPartnershipCount(pStrong.id, pWeak.id, previousRounds) > 0;
+         const p3 = topHalf[t];
+         const p4 = bottomHalf[b];
+         const teamBScore = getTot(p3) + getTot(p4);
+         
+         // Balance factor (ELO difference)
+         const eloDiff = Math.abs(teamAScore - teamBScore);
+         
+         // Partnership factor (Penalty for already played together)
+         const partnershipPenalty = (getPartnershipCount(p3.id, p4.id, previousRounds) > 0) ? 50 : 0;
+         
+         const totalScore = eloDiff + partnershipPenalty;
 
-         if (bestPair.tIdx === -1) {
-            bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
-            continue;
-         }
-
-         if (bestPair.playedBefore && !played) {
-            bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
-         } else if (bestPair.playedBefore === played) {
-            if (diff < bestPair.diff) {
-               bestPair = { tIdx: t, bIdx: b, diff, playedBefore: played };
-            }
+         if (totalScore < bestPair.score) {
+            bestPair = { tIdx: t, bIdx: b, score: totalScore };
          }
       }
     }
@@ -235,13 +250,24 @@ export const generateRound = (
       ];
       
       let bestCombo = combos[0];
-      let minConflicts = Infinity;
+      let minPenalty = Infinity;
 
       for (const combo of combos) {
-        const c1 = getPartnershipCount(block[combo[0]].id, block[combo[1]].id, previousRounds);
-        const c2 = getPartnershipCount(block[combo[2]].id, block[combo[3]].id, previousRounds);
-        if (c1 + c2 < minConflicts) {
-          minConflicts = c1 + c2;
+        const t1 = [block[combo[0]], block[combo[1]]];
+        const t2 = [block[combo[2]], block[combo[3]]];
+        
+        // Match Balance (ELO diff)
+        const diff = Math.abs((getTot(t1[0]) + getTot(t1[1])) - (getTot(t2[0]) + getTot(t2[1])));
+        
+        // Partnership history
+        const p1 = getPartnershipCount(t1[0].id, t1[1].id, previousRounds);
+        const p2 = getPartnershipCount(t2[0].id, t2[1].id, previousRounds);
+        
+        // Penalty: favor balance but discourage repeat partnerships strongly
+        const penalty = diff + (p1 * 100) + (p2 * 100);
+
+        if (penalty < minPenalty) {
+          minPenalty = penalty;
           bestCombo = combo;
         }
       }

@@ -334,6 +334,103 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onUpdateSetting
                   )}
                 </div>
               </div>
+
+              {/* Formula Legend */}
+              <div className="px-8 pb-8 pt-4 border-t border-slate-100">
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
+                    <span className="text-sm">📖</span> Legenda & Formule di Calcolo
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-black text-slate-800 uppercase italic">Logica del Sistema (2vs2 ELO)</div>
+                        <p className="text-[9px] text-slate-500 font-bold leading-relaxed">
+                          Il sistema calcola la <span className="text-slate-800">Probabilità di Vittoria</span> basandosi sulla differenza tra l'ELO medio del proprio team e quello avversario.
+                          <br/><br/>
+                          <span className="bg-white px-2 py-1 rounded border border-slate-200 text-slate-800 text-[8px]">Es: Atleta A (1200) + Atleta B (1100) vs Atleta C (1050) + Atleta D (1050)</span>
+                          <br/>
+                          Il Team 1 ha una probabilità superiore di vittoria essendo più forte sulla carta.
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-black text-slate-800 uppercase italic">Calcolo della Variazione</div>
+                        <p className="text-[9px] text-slate-500 font-bold leading-relaxed">
+                          Punti Individuali = <span className="text-slate-800">K-Effettivo × (Risultato - Probabilità)</span>
+                          <br/><br/>
+                          • <span className="text-slate-800">Risultato:</span> 1 per vittoria, 0 per sconfitta (0.5 per pareggio).<br/>
+                          • <span className="text-slate-800">K-Effettivo:</span> La "sensibilità" (K-Base modificato da Bonus/Scarto).
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm space-y-4">
+                         <div className="text-[10px] font-black text-slate-900 uppercase italic border-b pb-2">Esempio "Zero-Sum" per Team (K=12)</div>
+                         <div className="text-[9px] font-bold text-slate-500 leading-relaxed space-y-3">
+                            <div className="p-2 bg-slate-50 rounded-lg border border-slate-100 italic">
+                               <span className="text-slate-800 block mb-1">Principio Base:</span>
+                               I punti non vengono "creati", ma scambiati. Quello che il Team A guadagna è esattamente ciò che il Team B perde.
+                            </div>
+
+                            <div className="space-y-1">
+                               <span className="text-slate-800 block mb-1">Scenario: Team A (Media 1200) vs Team B (Media 1000)</span>
+                               Il Team A è favorito. Lo scambio base (match delta) calcolato è di <span className="text-blue-600">5.8 punti totali</span>.
+                            </div>
+                            
+                            <div className="p-3 bg-green-50/50 rounded-xl border border-green-100">
+                               <span className="text-green-800 block mb-1 font-black uppercase text-[8px]">Se vince il Team A (Favorito):</span>
+                               <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                     <p className="text-slate-400 uppercase text-[7px] mb-1">Team A Guadagna (+5.8)</p>
+                                     <p className="text-slate-700">• G1 (Forte): +2.1</p>
+                                     <p className="text-slate-700">• G2 (Debole): +3.7</p>
+                                  </div>
+                                  <div>
+                                     <p className="text-slate-400 uppercase text-[7px] mb-1">Team B Perde (-5.8)</p>
+                                     <p className="text-slate-700">• G3: -2.9</p>
+                                     <p className="text-slate-700">• G4: -2.9</p>
+                                  </div>
+                               </div>
+                            </div>
+
+                            <div className="p-3 bg-red-50/50 rounded-xl border border-red-100">
+                               <span className="text-red-800 block mb-1 font-black uppercase text-[8px]">Se vince il Team B (Sorpresa):</span>
+                               <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                     <p className="text-slate-400 uppercase text-[7px] mb-1">Team A Perde (-18.2)</p>
+                                     <p className="text-slate-700">• G1 (Forte): -10.5</p>
+                                     <p className="text-slate-700">• G2 (Debole): -7.7</p>
+                                  </div>
+                                  <div>
+                                     <p className="text-slate-400 uppercase text-[7px] mb-1">Team B Guadagna (+18.2)</p>
+                                     <p className="text-slate-700">• G3: +9.1</p>
+                                     <p className="text-slate-700">• G4: +9.1</p>
+                                  </div>
+                               </div>
+                            </div>
+
+                            <p className="text-[8px] italic text-slate-400 mt-1">
+                               La somma dei punti guadagnati (Team A) è sempre uguale alla somma dei punti persi (Team B), mantenendo l'ecosistema in equilibrio.
+                            </p>
+                         </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="p-3 bg-white rounded-xl border border-slate-200 flex flex-col justify-center">
+                           <div className="text-[8px] font-extrabold text-slate-900 mb-1 uppercase">CLASSIC</div>
+                           <p className="text-[7px] text-slate-400 leading-tight">Bonus "on/off" quando superi lo scarto impostato.</p>
+                        </div>
+                        <div className="p-3 bg-white rounded-xl border border-slate-200 flex flex-col justify-center">
+                           <div className="text-[8px] font-extrabold text-red-600 mb-1 uppercase">PROPORTIONAL</div>
+                           <p className="text-[7px] text-slate-400 leading-tight">Bonus dinamico che cresce per ogni punto di scarto.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </section>
 
             {/* Sandbox Simulator */}
