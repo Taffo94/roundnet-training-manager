@@ -81,7 +81,9 @@ export interface Round {
   matches: Match[];
   restingPlayerIds: string[];
   mode: MatchmakingMode;
+  initialRatings?: Record<string, { basePoints: number; matchPoints: number }>;
 }
+
 
 export interface TrainingSession {
   id: string;
@@ -89,7 +91,9 @@ export interface TrainingSession {
   participantIds: string[];
   rounds: Round[];
   status: 'ACTIVE' | 'ARCHIVED';
+  initialRatings?: Record<string, { basePoints: number; matchPoints: number }>;
 }
+
 
 export interface AppState {
   players: Player[];

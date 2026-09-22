@@ -35,6 +35,13 @@ const App: React.FC = () => {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [deleteModalConfig, setDeleteModalConfig] = useState<{
+    type: 'session' | 'round';
+    sessionId: string;
+    roundId?: string;
+    sessionDate?: number;
+    roundNumber?: number;
+  } | null>(null);
   const isInitialMount = useRef(true);
 
   useEffect(() => {
@@ -86,7 +93,9 @@ const App: React.FC = () => {
   const updateMatchScore = (sessionId: string, roundId: string, matchId: string, s1: number, s2: number) => {
     setState(prev => {
       if (!prev) return null;
-      let playersToUpdate: Player[] = [];
+      const targetSession = prev.sessions.find(s => s.id === sessionId);
+      const isArchived = targetSession?.status === 'ARCHIVED';
+
       const sessions = prev.sessions.map(s => s.id === sessionId ? {
         ...s, rounds: s.rounds.map(r => r.id === roundId ? {
           ...r, matches: r.matches.map(m => {
@@ -94,45 +103,132 @@ const App: React.FC = () => {
             const p1 = prev.players.find(p => p.id === m.team1.playerIds[0]), p2 = prev.players.find(p => p.id === m.team1.playerIds[1]);
             const p3 = prev.players.find(p => p.id === m.team2.playerIds[0]), p4 = prev.players.find(p => p.id === m.team2.playerIds[1]);
             if (!p1 || !p2 || !p3 || !p4) return m;
-            const result = calculateNewRatings(p1, p2, p3, p4, s1, s2, prev.settings.ranking);
-            playersToUpdate = result.players;
-            return { ...m, status: 'COMPLETED' as const, team1: { ...m.team1, score: s1 }, team2: { ...m.team2, score: s2 }, pointsDelta: result.delta, individualDeltas: result.individualDeltas };
+
+            // Usa i punteggi congelati a inizio sessione per calcolare l'Expected Score e i delta
+            const getInit = (p: Player) => {
+              const init = s.initialRatings?.[p.id];
+              return init ? { ...p, basePoints: init.basePoints, matchPoints: init.matchPoints } : p;
+            };
+
+            const p1Init = getInit(p1);
+            const p2Init = getInit(p2);
+            const p3Init = getInit(p3);
+            const p4Init = getInit(p4);
+
+            const result = calculateNewRatings(p1Init, p2Init, p3Init, p4Init, s1, s2, prev.settings.ranking);
+            return {
+              ...m,
+              status: 'COMPLETED' as const,
+              team1: { ...m.team1, score: s1 },
+              team2: { ...m.team2, score: s2 },
+              pointsDelta: result.delta,
+              individualDeltas: result.individualDeltas
+            };
           })
         } : r)
       } : s);
-      return { ...prev, sessions, players: prev.players.map(p => playersToUpdate.find(u => u.id === p.id) || p) };
+
+      // Se la sessione è attiva, la classifica ufficiale NON viene modificata durante l'allenamento:
+      // i punti verranno accreditati tutti insieme al momento di archiviazione sessione.
+      return { ...prev, sessions };
     });
   };
 
-  const recalculateAllPoints = async () => {
+  const recalculateAllPoints = async (overrideSessions?: TrainingSession[]) => {
     if (!state) return;
 
     setIsSyncing(true);
     let updatedPlayers = state.players.map(p => ({ ...p, matchPoints: 0, wins: 0, losses: 0 }));
-    const sortedSessions = [...state.sessions]
+    const targetSessions = overrideSessions || state.sessions;
+    const sortedSessions = [...targetSessions]
       .filter(s => s.status === 'ARCHIVED')
       .sort((a, b) => a.date - b.date);
 
     for (const session of sortedSessions) {
+      // All'inizio di ogni sessione storica congeliamo i punti correnti dei giocatori
+      const sessionStartRatings = new Map(updatedPlayers.map(p => [p.id, { ...p }]));
+      const sessionDeltas: Record<string, { delta: number; wins: number; losses: number }> = {};
+
       for (const round of session.rounds) {
         for (const match of round.matches) {
           if (match.status === 'COMPLETED' && match.team1.score !== undefined && match.team2.score !== undefined) {
-            const p1 = updatedPlayers.find(p => p.id === match.team1.playerIds[0]);
-            const p2 = updatedPlayers.find(p => p.id === match.team1.playerIds[1]);
-            const p3 = updatedPlayers.find(p => p.id === match.team2.playerIds[0]);
-            const p4 = updatedPlayers.find(p => p.id === match.team2.playerIds[1]);
+            const p1 = sessionStartRatings.get(match.team1.playerIds[0]);
+            const p2 = sessionStartRatings.get(match.team1.playerIds[1]);
+            const p3 = sessionStartRatings.get(match.team2.playerIds[0]);
+            const p4 = sessionStartRatings.get(match.team2.playerIds[1]);
 
             if (p1 && p2 && p3 && p4) {
               const result = calculateNewRatings(p1, p2, p3, p4, match.team1.score, match.team2.score, state.settings.ranking);
-              updatedPlayers = updatedPlayers.map(p => result.players.find(up => up.id === p.id) || p);
+              match.pointsDelta = result.delta;
+              match.individualDeltas = result.individualDeltas;
+
+              const isWin1 = match.team1.score > match.team2.score ? 1 : 0;
+              const isWin2 = match.team2.score > match.team1.score ? 1 : 0;
+
+              [match.team1.playerIds[0], match.team1.playerIds[1]].forEach(id => {
+                if (!sessionDeltas[id]) sessionDeltas[id] = { delta: 0, wins: 0, losses: 0 };
+                sessionDeltas[id].delta += result.individualDeltas[id] || 0;
+                sessionDeltas[id].wins += isWin1;
+                sessionDeltas[id].losses += (1 - isWin1);
+              });
+              [match.team2.playerIds[0], match.team2.playerIds[1]].forEach(id => {
+                if (!sessionDeltas[id]) sessionDeltas[id] = { delta: 0, wins: 0, losses: 0 };
+                sessionDeltas[id].delta += result.individualDeltas[id] || 0;
+                sessionDeltas[id].wins += isWin2;
+                sessionDeltas[id].losses += (1 - isWin2);
+              });
             }
           }
         }
       }
+
+      // Applichiamo i delta accumulati nella sessione solo al termine della sessione stessa
+      updatedPlayers = updatedPlayers.map(p => {
+        const d = sessionDeltas[p.id];
+        if (!d) return p;
+        return {
+          ...p,
+          matchPoints: p.matchPoints + d.delta,
+          wins: p.wins + d.wins,
+          losses: p.losses + d.losses
+        };
+      });
     }
-    setState({ ...state, players: updatedPlayers });
+    setState(prev => prev ? ({ ...prev, players: updatedPlayers, sessions: targetSessions }) : null);
     await savePlayersToDB(updatedPlayers);
+    await saveSessionsToDB(targetSessions);
     setIsSyncing(false);
+  };
+
+  const handleConfirmDelete = async (recalculate: boolean) => {
+    if (!deleteModalConfig) return;
+    const { type, sessionId, roundId } = deleteModalConfig;
+    setDeleteModalConfig(null);
+
+    if (type === 'session') {
+      try {
+        await deleteSessionFromDB(sessionId);
+      } catch (e) {
+        console.error("Errore cancellazione sessione da DB:", e);
+      }
+      const remainingSessions = (state?.sessions || []).filter(s => s.id !== sessionId);
+      if (recalculate) {
+        await recalculateAllPoints(remainingSessions);
+      } else {
+        setState(prev => prev ? ({ ...prev, sessions: remainingSessions }) : null);
+      }
+    } else if (type === 'round' && roundId) {
+      const updatedSessions = (state?.sessions || []).map(s => {
+        if (s.id !== sessionId) return s;
+        return { ...s, rounds: s.rounds.filter(r => r.id !== roundId) };
+      });
+      if (recalculate) {
+        await recalculateAllPoints(updatedSessions);
+      } else {
+        setState(prev => prev ? ({ ...prev, sessions: updatedSessions }) : null);
+        await saveSessionsToDB(updatedSessions);
+      }
+    }
   };
 
   const activeSession = state?.sessions.find(s => s.status === 'ACTIVE');
@@ -261,17 +357,125 @@ const App: React.FC = () => {
         {isAdmin && state.currentTab === 'training' && (
           <ActiveTraining
             attendanceMap={attendanceMap} session={activeSession} players={state.players}
-            onStartSession={(ids, date) => setState(p => p ? ({ ...p, sessions: [{ id: Math.random().toString(36).substr(2, 9), date, participantIds: ids, rounds: [], status: 'ACTIVE' }, ...p.sessions], currentTab: 'training' }) : null)}
-            onAddRound={(sid, mode) => setState(prev => { if (!prev) return null; const s = prev.sessions.find(x => x.id === sid); if (!s) return prev; return { ...prev, sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: [...x.rounds, generateRound(prev.players.filter(p => s.participantIds.includes(p.id)), mode, x.rounds.length + 1, x.rounds)] } : x) }; })}
+            onStartSession={(ids, date) => setState(p => {
+              if (!p) return null;
+              const initialRatings: Record<string, { basePoints: number; matchPoints: number }> = {};
+              ids.forEach(id => {
+                const pl = p.players.find(x => x.id === id);
+                if (pl) {
+                  initialRatings[id] = { basePoints: pl.basePoints, matchPoints: pl.matchPoints };
+                }
+              });
+              return {
+                ...p,
+                sessions: [{
+                  id: Math.random().toString(36).substr(2, 9),
+                  date,
+                  participantIds: ids,
+                  rounds: [],
+                  status: 'ACTIVE',
+                  initialRatings
+                }, ...p.sessions],
+                currentTab: 'training'
+              };
+            })}
+            onAddRound={(sid, mode) => setState(prev => {
+              if (!prev) return null;
+              const s = prev.sessions.find(x => x.id === sid);
+              if (!s) return prev;
+              const sessionParticipants = prev.players
+                .filter(p => s.participantIds.includes(p.id))
+                .map(p => {
+                  const init = s.initialRatings?.[p.id];
+                  return init ? { ...p, basePoints: init.basePoints, matchPoints: init.matchPoints } : p;
+                });
+              const newRound = generateRound(sessionParticipants, mode, s.rounds.length + 1, s.rounds);
+              if (s.rounds.length === 0 && s.initialRatings) {
+                newRound.initialRatings = s.initialRatings;
+              }
+              return {
+                ...prev,
+                sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: [...x.rounds, newRound] } : x)
+              };
+            })}
             onDeleteRound={(sid, rid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.filter(r => r.id !== rid) } : s) }) : null)}
-            onRefreshRound={(sid, rid) => setState(prev => { if (!prev) return null; const s = prev.sessions.find(x => x.id === sid); const r = s?.rounds.find(x => x.id === rid); if (!s || !r) return prev; const newRound = generateRound(prev.players.filter(p => s.participantIds.includes(p.id)), r.mode, r.roundNumber, s.rounds.slice(0, s.rounds.indexOf(r))); return { ...prev, sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: x.rounds.map(y => y.id === rid ? newRound : y) } : x) }; })}
+            onRefreshRound={(sid, rid) => setState(prev => {
+              if (!prev) return null;
+              const s = prev.sessions.find(x => x.id === sid);
+              const r = s?.rounds.find(x => x.id === rid);
+              if (!s || !r) return prev;
+              const sessionParticipants = prev.players
+                .filter(p => s.participantIds.includes(p.id))
+                .map(p => {
+                  const init = s.initialRatings?.[p.id];
+                  return init ? { ...p, basePoints: init.basePoints, matchPoints: init.matchPoints } : p;
+                });
+              const newRound = generateRound(sessionParticipants, r.mode, r.roundNumber, s.rounds.slice(0, s.rounds.indexOf(r)));
+              if (r.roundNumber === 1 && s.initialRatings) {
+                newRound.initialRatings = s.initialRatings;
+              }
+              return {
+                ...prev,
+                sessions: prev.sessions.map(x => x.id === sid ? { ...x, rounds: x.rounds.map(y => y.id === rid ? newRound : y) } : x)
+              };
+            })}
             onUpdateScore={updateMatchScore}
             onReopenMatch={(sid, rid, mid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, matches: r.matches.map(m => m.id === mid ? { ...m, status: 'PENDING' } : m) } : r) } : s) }) : null)}
             onUpdatePlayers={(sid, rid, mid, team, idx, pid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, matches: r.matches.map(m => m.id === mid ? { ...m, [team === 1 ? 'team1' : 'team2']: { ...m[team === 1 ? 'team1' : 'team2'], playerIds: m[team === 1 ? 'team1' : 'team2'].playerIds.map((p, i) => i === idx ? pid : p) } } : m) } : r) } : s) }) : null)}
             onUpdateResting={(sid, rid, idx, pid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, restingPlayerIds: r.restingPlayerIds.map((p, i) => i === idx ? pid : p) } : r) } : s) }) : null)}
             onUpdateSessionDate={(sid, date) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, date } : s) }) : null)}
             onEditParticipants={(ids) => activeSession && setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === activeSession.id ? { ...s, participantIds: ids } : s) }) : null)}
-            onArchive={(id) => setState(p => p ? ({ ...p, sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' } : x), currentTab: 'history' }) : null)}
+            onArchive={(id) => setState(p => {
+              if (!p) return null;
+              const targetSession = p.sessions.find(x => x.id === id);
+              if (!targetSession) return p;
+
+              // Calcola la somma algebrica dei delta e w/l della sessione per ciascun giocatore
+              const sessionDeltas: Record<string, { delta: number; wins: number; losses: number }> = {};
+              targetSession.rounds.forEach(r => {
+                r.matches.forEach(m => {
+                  if (m.status === 'COMPLETED' && m.individualDeltas) {
+                    const s1 = m.team1.score || 0;
+                    const s2 = m.team2.score || 0;
+                    const t1Wins = s1 > s2 ? 1 : 0;
+                    const t2Wins = s2 > s1 ? 1 : 0;
+
+                    m.team1.playerIds.forEach(pId => {
+                      if (!sessionDeltas[pId]) sessionDeltas[pId] = { delta: 0, wins: 0, losses: 0 };
+                      sessionDeltas[pId].delta += m.individualDeltas![pId] || 0;
+                      sessionDeltas[pId].wins += t1Wins;
+                      sessionDeltas[pId].losses += (1 - t1Wins);
+                    });
+                    m.team2.playerIds.forEach(pId => {
+                      if (!sessionDeltas[pId]) sessionDeltas[pId] = { delta: 0, wins: 0, losses: 0 };
+                      sessionDeltas[pId].delta += m.individualDeltas![pId] || 0;
+                      sessionDeltas[pId].wins += t2Wins;
+                      sessionDeltas[pId].losses += (1 - t2Wins);
+                    });
+                  }
+                });
+              });
+
+              const updatedPlayers = p.players.map(pl => {
+                const d = sessionDeltas[pl.id];
+                if (!d) return pl;
+                return {
+                  ...pl,
+                  matchPoints: pl.matchPoints + d.delta,
+                  wins: pl.wins + d.wins,
+                  losses: pl.losses + d.losses
+                };
+              });
+
+              savePlayersToDB(updatedPlayers).catch(console.error);
+
+              return {
+                ...p,
+                players: updatedPlayers,
+                sessions: p.sessions.map(x => x.id === id ? { ...x, status: 'ARCHIVED' as const } : x),
+                currentTab: 'history'
+              };
+            })}
             onSelectPlayer={(id) => setState(p => p ? ({ ...p, currentTab: 'stats', selectedPlayerId: id }) : null)}
             onDeleteSession={(id) => { if(window.confirm("Annullare l'allenamento e tornare alla selezione?")) { deleteSessionFromDB(id); setState(p => p ? ({ ...p, sessions: p.sessions.filter(x => x.id !== id) }) : null); } }}
             settings={state.settings}
@@ -281,8 +485,25 @@ const App: React.FC = () => {
           <TrainingHistory
             sessions={state.sessions.filter(s => s.status === 'ARCHIVED')} players={state.players} isAdmin={isAdmin}
             onUpdateSessionDate={(sid, date) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, date } : s) }) : null)}
-            onDeleteRound={(sid, rid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.filter(r => r.id !== rid) } : s) }) : null)}
-            onDeleteSession={(sid) => { if (window.confirm("Eliminare definitivamente l'intera sessione archiviata?")) { deleteSessionFromDB(sid); setState(prev => prev ? ({ ...prev, sessions: prev.sessions.filter(s => s.id !== sid) }) : null); } }}
+            onDeleteRound={(sid, rid) => {
+              const s = state?.sessions.find(x => x.id === sid);
+              const r = s?.rounds.find(x => x.id === rid);
+              setDeleteModalConfig({
+                type: 'round',
+                sessionId: sid,
+                roundId: rid,
+                sessionDate: s?.date,
+                roundNumber: r?.roundNumber
+              });
+            }}
+            onDeleteSession={(sid) => {
+              const s = state?.sessions.find(x => x.id === sid);
+              setDeleteModalConfig({
+                type: 'session',
+                sessionId: sid,
+                sessionDate: s?.date
+              });
+            }}
             onUpdateScore={updateMatchScore}
             onReopenMatch={(sid, rid, mid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, matches: r.matches.map(m => m.id === mid ? { ...m, status: 'PENDING' } : m) } : r) } : s) }) : null)}
             onUpdatePlayers={(sid, rid, mid, team, idx, pid) => setState(prev => prev ? ({ ...prev, sessions: prev.sessions.map(s => s.id === sid ? { ...s, rounds: s.rounds.map(r => r.id === rid ? { ...r, matches: r.matches.map(m => m.id === mid ? { ...m, [team === 1 ? 'team1' : 'team2']: { ...m[team === 1 ? 'team1' : 'team2'], playerIds: m[team === 1 ? 'team1' : 'team2'].playerIds.map((p, i) => i === idx ? pid : p) } } : m) } : r) } : s) }) : null)}
@@ -306,6 +527,63 @@ const App: React.FC = () => {
             }}
             onRecalculateGlobal={recalculateAllPoints}
           />
+        )}
+
+        {/* MODAL DI CONFERMA ELIMINAZIONE SESSIONE / ROUND */}
+        {deleteModalConfig && (
+          <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[300] flex items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl p-10 text-center space-y-6 animate-in zoom-in-95 duration-300">
+              <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto text-3xl shadow-inner font-black">
+                🗑️
+              </div>
+              <div>
+                <h4 className="text-2xl font-black text-slate-800 uppercase italic tracking-tighter">
+                  {deleteModalConfig.type === 'session' ? 'Elimina Sessione' : `Elimina Round ${deleteModalConfig.roundNumber || ''}`}
+                </h4>
+                {deleteModalConfig.sessionDate && (
+                  <p className="text-red-600 text-xs font-black uppercase tracking-widest mt-1">
+                    {new Date(deleteModalConfig.sessionDate).toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                  </p>
+                )}
+                <p className="text-slate-500 text-xs font-bold uppercase mt-3">
+                  Come desideri gestire la classifica generale?
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <button
+                  onClick={() => handleConfirmDelete(true)}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white p-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-red-200 transition-all text-left flex flex-col group cursor-pointer"
+                >
+                  <span className="flex items-center gap-2 text-sm font-black">
+                    <span>⚡</span> Elimina e Ricalcola Classifica
+                  </span>
+                  <span className="text-[11px] text-white/85 font-semibold normal-case tracking-normal mt-1">
+                    Rimuove la sessione e storna i punti vinti/persi dalla classifica degli atleti.
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => handleConfirmDelete(false)}
+                  className="w-full bg-slate-900 hover:bg-black text-white p-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all text-left flex flex-col group cursor-pointer"
+                >
+                  <span className="flex items-center gap-2 text-sm font-black">
+                    <span>🔒</span> Elimina Mantenendo Classifica
+                  </span>
+                  <span className="text-[11px] text-slate-300 font-semibold normal-case tracking-normal mt-1">
+                    Rimuove la sessione dallo storico ma lascia i punteggi attuali della classifica invariati.
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setDeleteModalConfig(null)}
+                  className="w-full py-3 text-slate-400 font-black uppercase text-[11px] tracking-widest hover:text-slate-600 transition-colors cursor-pointer"
+                >
+                  Annulla (Non eliminare nulla)
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
       <footer className="py-8 text-center text-slate-400 text-[10px] uppercase font-bold tracking-widest bg-white border-t">&copy; {new Date().getFullYear()} Roundnet Milano Manager</footer>

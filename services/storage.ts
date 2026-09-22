@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { AppSettings, AppSnapshot, Player, TrainingSession, MatchmakingMode } from '../types';
+import { AppSettings, AppSnapshot, Player, TrainingSession, MatchmakingMode, Round } from '../types';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
@@ -103,13 +103,18 @@ export const loadFullState = async (): Promise<{players: Player[], sessions: Tra
     lastActive: Date.now()
   }));
 
-  const sessions: TrainingSession[] = (sessionsRes.data || []).map(s => ({
-    id: s.id,
-    date: s.date,
-    status: s.status,
-    participantIds: s.participant_ids,
-    rounds: s.rounds
-  }));
+  const sessions: TrainingSession[] = (sessionsRes.data || []).map(s => {
+    const rounds: Round[] = s.rounds || [];
+    const initialRatings = (s as any).initial_ratings || (s as any).initialRatings || rounds[0]?.initialRatings;
+    return {
+      id: s.id,
+      date: s.date,
+      status: s.status,
+      participantIds: s.participant_ids,
+      rounds,
+      initialRatings
+    };
+  });
 
   return { players, sessions };
 };
@@ -156,13 +161,19 @@ export const savePlayersToDB = async (players: Player[]) => {
 
 export const saveSessionsToDB = async (sessions: TrainingSession[]) => {
   if (!supabase) return;
-  const dbData = sessions.map(s => ({
-    id: s.id,
-    date: s.date,
-    status: s.status,
-    participant_ids: s.participantIds,
-    rounds: s.rounds
-  }));
+  const dbData = sessions.map(s => {
+    const rounds = [...(s.rounds || [])];
+    if (rounds.length > 0 && s.initialRatings && !rounds[0].initialRatings) {
+      rounds[0] = { ...rounds[0], initialRatings: s.initialRatings };
+    }
+    return {
+      id: s.id,
+      date: s.date,
+      status: s.status,
+      participant_ids: s.participantIds,
+      rounds
+    };
+  });
   const { error } = await supabase.from('sessions').upsert(dbData);
   if (error) throw error;
 };

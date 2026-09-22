@@ -57,7 +57,10 @@ const ActiveTraining: React.FC<ActiveTrainingProps> = ({
   const getTeamPoints = (ids: string[]) => {
     const total = ids.reduce((acc, id) => {
       const p = getPlayer(id);
-      return acc + (p ? (p.basePoints + p.matchPoints) : 0);
+      const init = session?.initialRatings?.[id];
+      const base = init ? init.basePoints : (p ? p.basePoints : 0);
+      const match = init ? init.matchPoints : (p ? p.matchPoints : 0);
+      return acc + (base + match);
     }, 0);
     return Math.round(total);
   };
