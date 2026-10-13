@@ -99,6 +99,6 @@ export interface AppState {
   players: Player[];
   sessions: TrainingSession[];
   settings: AppSettings;
-  currentTab: 'ranking' | 'training' | 'history' | 'stats' | 'settings';
+  currentTab: 'ranking' | 'training' | 'history' | 'stats' | 'settings' | 'how-it-works';
   selectedPlayerId: string | null;
 }

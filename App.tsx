@@ -9,6 +9,7 @@ import TrainingHistory from './components/TrainingHistory';
 import PlayerStats from './components/PlayerStats';
 import AdminSettings from './components/AdminSettings';
 import RankingSimulator from './components/RankingSimulator';
+import HowItWorks from './components/HowItWorks';
 
 const AUTH_STORAGE_KEY = 'rmi_auth_session';
 
@@ -235,8 +236,8 @@ const App: React.FC = () => {
   const isAdmin = auth === 'admin';
 
   const tabs = isAdmin
-    ? ['ranking', 'training', 'history', 'stats', 'settings']
-    : (state?.settings.showStatsToAthletes ? ['ranking', 'history', 'stats'] : ['ranking', 'history']);
+    ? ['ranking', 'training', 'history', 'stats', 'how-it-works', 'settings']
+    : (state?.settings.showStatsToAthletes ? ['ranking', 'history', 'stats', 'how-it-works'] : ['ranking', 'history', 'how-it-works']);
 
   const rankingDeltas = useMemo(() => {
     if (!state || state.sessions.length === 0) return {};
@@ -327,7 +328,9 @@ const App: React.FC = () => {
           </div>
           <nav className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner overflow-x-auto max-w-full no-scrollbar">
             {tabs.map(tab => (
-              <button key={tab} onClick={() => setState(p => p ? ({ ...p, currentTab: tab as any }) : null)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 whitespace-nowrap ${state.currentTab === tab ? 'bg-white text-red-600 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-800'}`}>{tab === 'settings' ? '⚙️ Tech' : tab}</button>
+              <button key={tab} onClick={() => setState(p => p ? ({ ...p, currentTab: tab as any }) : null)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 whitespace-nowrap ${state.currentTab === tab ? 'bg-white text-red-600 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-800'}`}>
+                {tab === 'settings' ? '⚙️ Tech' : tab === 'how-it-works' ? '💡 Come Funziona' : tab}
+              </button>
             ))}
           </nav>
         </div>
@@ -513,6 +516,9 @@ const App: React.FC = () => {
         )}
         {state.currentTab === 'stats' && (
           <PlayerStats players={state.players} sessions={state.sessions} selectedPlayerId={state.selectedPlayerId} onSelectPlayer={(id) => setState(p => p ? ({ ...p, selectedPlayerId: id }) : null)} />
+        )}
+        {state.currentTab === 'how-it-works' && (
+          <HowItWorks players={state.players} rankingSettings={state.settings.ranking} />
         )}
         {isAdmin && state.currentTab === 'settings' && (
           <AdminSettings
