@@ -32,6 +32,11 @@ export const loadSettings = async (): Promise<AppSettings> => {
         bonusFactor: 1.25,
         maxPossibleMargin: 21
       }
+    },
+    rankingWindow: {
+      mode: 'ALL',
+      months: 3,
+      sessionCount: 10
     }
   };
 
@@ -62,7 +67,8 @@ export const loadSettings = async (): Promise<AppSettings> => {
       ...saved.ranking,
       classic: { ...defaultSettings.ranking.classic, ...(saved.ranking?.classic || {}) },
       proportional: { ...defaultSettings.ranking.proportional, ...(saved.ranking?.proportional || {}) }
-    }
+    },
+    rankingWindow: saved.rankingWindow || defaultSettings.rankingWindow
   };
 };
 

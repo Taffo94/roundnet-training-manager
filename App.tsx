@@ -340,7 +340,20 @@ const App: React.FC = () => {
         {state.currentTab === 'ranking' && (
           <>
             <PlayerList
-              players={state.players} deltas={rankingDeltas} isAdmin={isAdmin}
+              players={state.players}
+              sessions={state.sessions}
+              deltas={rankingDeltas}
+              isAdmin={isAdmin}
+              rankingWindow={state.settings.rankingWindow}
+              onSaveRankingWindow={async (newFilter) => {
+                const updatedSettings = {
+                  ...state.settings,
+                  rankingWindow: newFilter,
+                  lastUpdated: Date.now()
+                };
+                setState(p => p ? ({ ...p, settings: updatedSettings }) : null);
+                await saveSettingsToDB(updatedSettings);
+              }}
               onAddPlayer={(n, ni, g, b) => setState(p => p ? ({ ...p, players: [...p.players, { id: Math.random().toString(36).substr(2, 9), name: n, nickname: ni, gender: g, wins: 0, losses: 0, basePoints: b, matchPoints: 0, lastActive: Date.now() }] }) : null)}
               onUpdatePlayer={(id, n, ni, g, b, m) => setState(p => p ? ({ ...p, players: p.players.map(x => x.id === id ? { ...x, name: n, nickname: ni, gender: g, basePoints: b, matchPoints: m } : x) }) : null)}
               onDeletePlayer={(id) => { if (window.confirm("Eliminare definitivamente l'atleta?")) { deletePlayerFromDB(id); setState(p => p ? ({ ...p, players: p.players.filter(x => x.id !== id) }) : null); } }}

@@ -39,12 +39,23 @@ export interface RankingSettings {
   proportional: RankingModeParams;
 }
 
+export type RankingFilterMode = 'ALL' | 'MONTHS' | 'SESSIONS' | 'COMBO' | 'CUSTOM';
+
+export interface RankingWindowFilter {
+  mode: RankingFilterMode;
+  months?: number;
+  sessionCount?: number;
+  startDate?: string;
+  endDate?: string;
+}
+
 export interface AppSettings {
   activeMatchmakingModes: MatchmakingMode[];
   allowManualSessionCreation: boolean;
   showStatsToAthletes: boolean;
   adminUICompactMode: boolean;
   ranking: RankingSettings;
+  rankingWindow?: RankingWindowFilter;
   lastUpdated?: number; 
 }
 
